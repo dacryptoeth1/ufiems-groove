@@ -1,0 +1,17 @@
+# Source artwork and reference images (not used by the site)
+WhatsApp Image *.jpeg
+assets/IMG_*.JPG
+assets/IMG_*.jpg
+
+# Screenshots and temp files
+*.tmp
+*.log
+screenshots/
+shots/
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/

@@ -1,0 +1,593 @@
+/* ==========================================================================
+   UFIEM’S GROOVE — Coming Soon
+   Single-screen cinematic experience. Nothing scrolls.
+
+   Intro sequence (driven by main.js adding classes to <html>):
+     is-stem (stem grows, closed bud appears) → is-bloom (petals open; main.js) → is-logo (the name
+     emerges from inside the flower) → is-fall (petals drift down; main.js) → is-title → is-tagline
+     → is-social / is-ambient
+   Without the `js` class (no JavaScript) every element renders in its final state.
+   ========================================================================== */
+
+:root {
+  --black: #040208;
+  --violet: #8b5cff;
+  --violet-hot: #b48cff;
+  --silver: #dcd8e8;
+
+  /* Pointer / idle parallax, written by main.js (range -1..1). */
+  --px: 0;
+  --py: 0;
+
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+  --ease-cine: cubic-bezier(.65, 0, .35, 1);
+
+  --font-title: "Italiana", "Cormorant Garamond", Didot, "Bodoni 72", serif;
+  --font-serif: "Cormorant Garamond", "Cormorant", Garamond, "Times New Roman", serif;
+
+  /* Height reserved at the bottom for the contact links. */
+  --social-h: clamp(56px, 10dvh, 96px);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ---- Lock the viewport: no scroll, no overflow, no rubber-banding ---- */
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: var(--black);
+}
+
+body {
+  position: fixed;
+  inset: 0;
+  color: var(--silver);
+  font-family: var(--font-serif);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.stage {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  isolation: isolate;
+  display: grid;
+  place-items: center;
+  padding: 12px 16px calc(var(--social-h) + env(safe-area-inset-bottom, 0px));
+}
+
+/* ==========================================================================
+   Environment
+   ========================================================================== */
+
+.env {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  animation: fade-in 2.6s ease-out both;
+}
+
+.env > * { position: absolute; }
+
+/* Parallax: each layer drifts by its own depth (px per unit of pointer). */
+.layer {
+  transform: translate3d(calc(var(--px) * var(--depth) * 1px),
+                         calc(var(--py) * var(--depth) * .6px), 0);
+  will-change: transform;
+}
+
+.env__base {
+  inset: 0;
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 36%, #1d0d3a 0%, #0e0620 42%, transparent 78%),
+    linear-gradient(180deg, #07030f 0%, var(--black) 60%, #020104 100%);
+}
+
+.env__ambient { inset: -15%; will-change: opacity, transform; }
+
+.env__ambient--a {
+  background: radial-gradient(ellipse 45% 38% at 26% 18%, rgba(112, 52, 230, .24), transparent 70%);
+  animation: ambient-a 17s ease-in-out infinite alternate;
+}
+
+.env__ambient--b {
+  background: radial-gradient(ellipse 48% 40% at 78% 82%, rgba(84, 24, 168, .28), transparent 70%);
+  animation: ambient-b 23s ease-in-out infinite alternate;
+}
+
+/* A colossal, barely-visible ring far behind everything. */
+.env__halo {
+  left: 50%;
+  top: 38%;
+  width: 160vmax;
+  height: 160vmax;
+  margin: -80vmax 0 0 -80vmax;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle,
+      transparent 0 21.7%, rgba(170, 130, 255, .06) 22%, transparent 22.4%,
+      transparent 33.6%, rgba(170, 130, 255, .04) 34%, transparent 34.5%,
+      transparent 49.2%, rgba(170, 130, 255, .025) 49.6%, transparent 50%);
+  animation: breathe 12s ease-in-out infinite;
+}
+
+.env__shafts {
+  inset: -5% 0 auto 0;
+  height: 85%;
+  background:
+    linear-gradient(101deg, transparent 31%, rgba(168, 128, 255, .05) 37%, transparent 43%),
+    linear-gradient(79deg, transparent 53%, rgba(168, 128, 255, .04) 58%, transparent 64%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 10%, transparent 100%);
+          mask-image: linear-gradient(to bottom, #000 10%, transparent 100%);
+  animation: shafts 14s ease-in-out infinite alternate;
+}
+
+.env__floor {
+  left: -10%;
+  right: -10%;
+  bottom: -18%;
+  height: 50%;
+  background: radial-gradient(ellipse 50% 50% at 50% 100%, rgba(98, 40, 200, .24), rgba(48, 16, 100, .1) 45%, transparent 72%);
+  animation: breathe 9s ease-in-out infinite reverse;
+}
+
+/* Fog — seamless tiles drifting sideways. Gradients stay inside their tile. */
+.fog { inset: -8%; overflow: hidden; }
+
+.fog::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 200%;
+  background-repeat: repeat-x;
+  background-size: 50% 100%;
+  will-change: transform;
+}
+
+.fog--back::before {
+  background-image:
+    radial-gradient(ellipse 30% 20% at 26% 62%, rgba(120, 70, 210, .14), transparent 70%),
+    radial-gradient(ellipse 28% 16% at 66% 34%, rgba(96, 44, 180, .11), transparent 70%),
+    radial-gradient(ellipse 58% 14% at 50% 84%, rgba(140, 96, 230, .09), transparent 70%);
+  animation: drift 140s linear infinite;
+}
+
+.fog--front::before {
+  background-image:
+    radial-gradient(ellipse 36% 18% at 34% 92%, rgba(70, 28, 130, .38), transparent 70%),
+    radial-gradient(ellipse 30% 13% at 74% 82%, rgba(120, 72, 210, .12), transparent 70%);
+  animation: drift 80s linear infinite reverse;
+}
+
+/* Ambient particle canvas — fades in once the intro has finished. */
+.fx {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transition: opacity 3.5s ease-out;
+}
+.js .fx { opacity: 0; }
+.js.is-ambient .fx { opacity: 1; }
+
+.env__vignette {
+  inset: 0;
+  background: radial-gradient(ellipse 78% 72% at 50% 44%, transparent 38%, rgba(2, 1, 5, .62) 78%, rgba(0, 0, 0, .94) 100%);
+}
+
+.env__grain {
+  inset: -120px;
+  opacity: .06;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: grain 1.1s steps(5) infinite;
+}
+
+/* ==========================================================================
+   Hero
+   ========================================================================== */
+
+.hero {
+  /* --L is the logo width; the flower (logo + stem) is 1.3 × --L tall. */
+  --L: clamp(160px, min(78vw, 44dvh), 500px);
+  --cs: clamp(28px, min(7vw, 7.6dvh), 92px);
+  --gap: clamp(6px, 1.6dvh, 18px);
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 100%;
+  text-align: center;
+  transform: translate3d(calc(var(--px) * -6px), calc(var(--py) * -4px), 0);
+}
+
+/* ---- Flower: stem + petals (SVG) with the logo as its heart ---- */
+.flower {
+  position: relative;
+  width: var(--L);
+  aspect-ratio: 1000 / 1300;
+  flex: none;
+}
+
+.flower__glow {
+  position: absolute;
+  left: 50%;
+  top: 35.85%;               /* monogram centre: 466 / 1300 */
+  width: 175%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, rgba(140, 80, 255, .30) 0%, rgba(104, 48, 220, .13) 26%, rgba(60, 20, 140, .05) 46%, transparent 64%);
+  pointer-events: none;
+  transition: opacity 2.4s ease-out;
+}
+.js .flower__glow { opacity: 0; }
+.js.is-bloom .flower__glow { opacity: 1; }
+.js.is-ambient .flower__glow { animation: glow 7s ease-in-out infinite; }
+
+/* Two layers of the same 1000 × 1300 drawing: back petals + stem behind the logo,
+   front petals + sepals in front of it, so the opening petals reveal the name. */
+.rose {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.rose--back  { z-index: 0; }
+.rose--front { z-index: 3; }   /* sepals sit over the base of the petals */
+
+.petal-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+/* ---- 3D petals ----
+   Each .bloom is a zero-size anchor on the bud's base (497, 1030 of 1000 × 1300) with its own
+   perspective; both layers share the same camera so they line up. Inside the scene 1em = 100
+   drawing units, so the petals scale with the logo. */
+.bloom {
+  position: absolute;
+  left: 49.7%;
+  top: 79.23%;
+  width: 0;
+  height: 0;
+  perspective: calc(var(--L) * 2.6);
+  perspective-origin: 0 calc(var(--L) * -.22);
+  pointer-events: none;
+  transition: opacity 1.4s ease-out;
+}
+.bloom--back  { z-index: 0; }
+.bloom--front { z-index: 2; }
+
+.bloom__scene {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  font-size: calc(var(--L) / 10);
+  transform-style: preserve-3d;
+  transform-origin: 0 0;
+  transform: rotateX(-12deg);           /* camera slightly above the flower */
+  transition: transform 1.8s var(--ease-out);
+}
+
+/* The closed bud rises into view on its base. */
+.js .bloom { opacity: 0; }
+.js .bloom__scene { transform: rotateX(-12deg) scale(.3); }
+.js.is-stem .bloom { opacity: 1; transition-delay: .9s; }
+.js.is-stem .bloom__scene { transform: rotateX(-12deg); transition-delay: .9s; }
+
+.petal3d {
+  position: absolute;
+  bottom: 0;
+  transform-origin: 50% 100%;           /* every petal hinges on its base */
+  backface-visibility: visible;
+  will-change: transform;
+}
+.petal3d { transform-style: preserve-3d; }
+.petal3d .ph { position: absolute; top: 0; bottom: 0; width: 50.4%; backface-visibility: visible; }
+.petal3d .ph--l { left: 0; transform-origin: 100% 50%; }
+.petal3d .ph--r { right: 0; transform-origin: 0% 50%; }
+.petal3d svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.petal3d .pt-shade { fill: #000; fill-opacity: var(--shade, .2); }
+.petal3d .pt-veins { fill: none; stroke: rgba(150, 104, 240, .16); stroke-width: .45; stroke-linecap: round; }
+.petal3d .pt-rim { fill: none; stroke: url(#pt-rim); stroke-width: 1.1; stroke-linecap: round; }
+.petal3d .pt-edge { fill: none; stroke: rgba(150, 105, 255, .32); stroke-width: .6; }
+
+/* Stem */
+.stem__body, .stem__rim {
+  fill: none;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 2s var(--ease-cine);
+}
+.stem__body { stroke: url(#stem-fill); stroke-width: 13; }
+.stem__rim  { stroke: url(#stem-rim); stroke-width: 2.4; transition-delay: .1s; }
+
+.stem__body, .stem__rim { transition-duration: 1.6s; }
+
+.stem__leaf, .stem__thorns, .calyx {
+  transform-box: fill-box;
+  transition: transform 1.4s var(--ease-out), opacity 1.2s ease-out;
+}
+.stem__leaf--r { transform-origin: 0% 40%; transition-delay: .35s; }
+.stem__leaf--l { transform-origin: 100% 40%; transition-delay: .6s; }
+.stem__thorns  { transition-delay: .7s; }
+.calyx         { transform-origin: 50% 25%; transition-delay: 1s; }
+
+.js .stem__body, .js .stem__rim { stroke-dashoffset: 1; }
+.js .stem__leaf, .js .calyx { opacity: 0; transform: scale(0); }
+.js .stem__thorns { opacity: 0; }
+.js.is-stem .stem__body, .js.is-stem .stem__rim { stroke-dashoffset: 0; }
+.js.is-stem .stem__leaf, .js.is-stem .calyx { opacity: 1; transform: none; }
+.js.is-stem .stem__thorns { opacity: 1; }
+
+/* ---- Logo ---- */
+.logo {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  z-index: 1;
+  font-size: 0;
+  line-height: 0;
+  transform-origin: 50% 50%;
+  transition:
+    opacity 1.8s ease-out .3s,
+    transform 4s cubic-bezier(.32, .08, .2, 1),
+    filter 3s ease-out .4s;
+}
+.logo img { display: block; width: 100%; height: auto; }
+
+/* Live wordmark over the emblem: Cinzel (Trajan-style capitals, like the original lettering). */
+.logo__wordmark {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 0 6px rgba(150, 100, 255, .35));
+}
+.logo__wordmark text {
+  font-family: "Cinzel", "Trajan Pro", "Cormorant Garamond", serif;
+  font-weight: 400;
+  font-size: 64px;            /* SVG user units: Cinzel caps are 0.72em → 46px, matching the original */
+}
+
+/* Before the bloom the logo is tiny and hidden inside the bud (its heart ≈ y 820 of 1300, i.e.
+   30% of the logo's own height below its final centre); the bloom lifts and grows it into place. */
+.js .logo { opacity: 0; transform: translate3d(0, 30%, 0) scale(.08); filter: blur(6px) brightness(1.8); }
+.js.is-logo .logo { opacity: 1; transform: none; filter: blur(0) brightness(1); }
+.js.is-ambient .logo { animation: logo-breathe 7s ease-in-out infinite; }
+
+/* ---- Coming Soon ---- */
+.headline {
+  margin-top: var(--gap);
+  padding-left: .14em;           /* balances trailing letter-spacing */
+  font-family: var(--font-title);
+  font-weight: 400;
+  font-size: var(--cs);
+  line-height: 1.1;
+  letter-spacing: .14em;
+  white-space: nowrap;
+  color: #f1ecff;
+  text-shadow: 0 0 22px rgba(150, 100, 255, .45), 0 0 2px rgba(255, 255, 255, .3);
+}
+.headline__word { display: inline-block; }
+.headline__word > span {
+  display: inline-block;
+  transition: opacity 1.3s ease-out, transform 1.6s var(--ease-out), filter 1.3s ease-out;
+  transition-delay: calc(var(--i) * 85ms);
+}
+.js .headline__word > span { opacity: 0; transform: translate3d(0, .5em, 0) scale(.9); filter: blur(8px); }
+.js.is-title .headline__word > span { opacity: 1; transform: none; filter: blur(0); }
+.js.is-ambient .headline { animation: title-glow 6s ease-in-out infinite; }
+
+/* ---- Tagline ---- */
+.tagline {
+  margin-top: calc(var(--gap) * .9);
+  max-width: 24em;
+  padding: 0 4px;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 300;
+  font-size: clamp(15px, min(2.2vw, 3dvh), 24px);
+  line-height: 1.35;
+  letter-spacing: .04em;
+  color: rgba(222, 216, 238, .76);
+  transition: opacity 2s ease-out, transform 2.2s var(--ease-out), filter 2s ease-out;
+}
+.js .tagline { opacity: 0; transform: translate3d(0, 10px, 0); filter: blur(5px); }
+.js.is-tagline .tagline { opacity: 1; transform: none; filter: blur(0); }
+
+/* ==========================================================================
+   Contact links
+   ========================================================================== */
+
+.social {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + clamp(4px, 2.4dvh, 26px));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0 clamp(6px, 1.6vw, 22px);
+  padding: 0 12px;
+  list-style: none;
+  transition: opacity 1.8s ease-out, transform 1.8s var(--ease-out);
+}
+.js .social { opacity: 0; transform: translate3d(0, 8px, 0); }
+.js.is-social .social { opacity: 1; transform: none; }
+
+.social a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 8px;
+  border-radius: 4px;
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: clamp(13px, min(1.5vw, 2.4dvh), 16px);
+  letter-spacing: .06em;
+  color: rgba(214, 204, 240, .72);
+  text-decoration: none;
+  transition: color .4s ease, text-shadow .4s ease;
+}
+.social svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--violet-hot);
+  opacity: .8;
+  transition: opacity .4s ease, filter .4s ease;
+}
+.social a:hover, .social a:focus-visible {
+  color: #fff;
+  text-shadow: 0 0 14px rgba(170, 120, 255, .8);
+}
+.social a:hover svg, .social a:focus-visible svg { opacity: 1; filter: drop-shadow(0 0 6px rgba(170, 120, 255, .9)); }
+.social a:focus-visible { outline: 1px solid rgba(180, 140, 255, .8); outline-offset: 2px; }
+
+.social__sep {
+  width: 4px;
+  height: 4px;
+  transform: rotate(45deg);
+  background: rgba(180, 140, 255, .6);
+  box-shadow: 0 0 8px rgba(160, 110, 255, .8);
+}
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+
+/* Portrait phones: let the logo use more of the width. */
+@media (max-width: 640px) and (orientation: portrait) {
+  .hero {
+    --L: clamp(160px, min(86vw, 46dvh), 420px);
+    --cs: clamp(26px, min(10vw, 6.4dvh), 60px);
+  }
+  .tagline { font-size: clamp(15px, min(4.4vw, 2.8dvh), 20px); }
+}
+
+@media (max-width: 400px) {
+  .social { gap: 0 2px; }
+  .social a { gap: 6px; padding: 0 4px; font-size: 13px; letter-spacing: .03em; }
+}
+
+/* Short landscape (phones on their side): flower on the left, words on the right. */
+@media (orientation: landscape) and (max-height: 520px) {
+  :root { --social-h: clamp(44px, 13dvh, 60px); }
+  .stage { padding-top: 8px; }
+  .hero {
+    --L: calc((100dvh - var(--social-h) - 20px) / 1.3);
+    --cs: clamp(24px, min(5.4vw, 11dvh), 56px);
+    display: grid;
+    grid-template-columns: auto auto;
+    grid-template-rows: 1fr auto auto 1fr;
+    column-gap: clamp(20px, 5vw, 64px);
+    align-items: center;
+  }
+  .flower { grid-column: 1; grid-row: 1 / -1; }
+  .headline { grid-column: 2; grid-row: 2; margin-top: 0; }
+  .tagline { grid-column: 2; grid-row: 3; font-size: clamp(13px, 4.2dvh, 19px); max-width: 18em; justify-self: center; }
+}
+
+/* ==========================================================================
+   Keyframes
+   ========================================================================== */
+
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+@keyframes ambient-a {
+  0%   { opacity: .45; transform: translate3d(-2%, -1%, 0) scale(1); }
+  100% { opacity: 1;   transform: translate3d(3%, 2%, 0) scale(1.08); }
+}
+
+@keyframes ambient-b {
+  0%   { opacity: 1;   transform: translate3d(2%, 1%, 0) scale(1.05); }
+  100% { opacity: .4;  transform: translate3d(-3%, -2%, 0) scale(1); }
+}
+
+@keyframes breathe { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+
+@keyframes shafts {
+  0%   { opacity: .5; transform: translate3d(-2%, 0, 0); }
+  100% { opacity: 1;  transform: translate3d(2%, 0, 0); }
+}
+
+@keyframes drift { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-50%, 0, 0); } }
+
+@keyframes grain {
+  0%   { transform: translate3d(0, 0, 0); }
+  20%  { transform: translate3d(-40px, 22px, 0); }
+  40%  { transform: translate3d(30px, -36px, 0); }
+  60%  { transform: translate3d(-18px, 44px, 0); }
+  80%  { transform: translate3d(46px, 10px, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+
+@keyframes glow {
+  0%, 100% { opacity: .75; transform: translate(-50%, -50%) scale(.95); }
+  50%      { opacity: 1;   transform: translate(-50%, -50%) scale(1.06); }
+}
+
+@keyframes logo-breathe {
+  0%, 100% { filter: drop-shadow(0 0 0 rgba(150, 100, 255, 0)); }
+  50%      { filter: drop-shadow(0 0 14px rgba(150, 100, 255, .35)); }
+}
+
+@keyframes title-glow {
+  0%, 100% { text-shadow: 0 0 22px rgba(150, 100, 255, .45), 0 0 2px rgba(255, 255, 255, .3); }
+  50%      { text-shadow: 0 0 32px rgba(170, 120, 255, .7), 0 0 2px rgba(255, 255, 255, .4); }
+}
+
+/* ==========================================================================
+   Reduced motion — no bloom, no falling petals, no drifting. Gentle fades only.
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .env, .env *, .env *::before, .env *::after,
+  .flower__glow, .logo, .headline {
+    animation: none !important;
+  }
+  .env { opacity: 1; }
+  .layer, .hero { transform: none !important; }
+  .stem__body, .stem__rim, .stem__leaf, .stem__thorns, .calyx, .bloom, .bloom__scene,
+  .logo, .headline__word > span, .tagline, .social, .flower__glow, .fx {
+    transition: opacity 1s ease-out !important;
+    transition-delay: 0s !important;
+  }
+  .js .stem__body, .js .stem__rim { stroke-dashoffset: 0; }
+  .js .stem__leaf, .js .calyx,
+  .js .logo, .js .headline__word > span, .js .tagline, .js .social {
+    transform: none;
+    filter: none;
+  }
+}

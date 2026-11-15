@@ -1,0 +1,15 @@
+# Upload only the site files
+*.jpeg
+*.JPG
+*.jpg
+*.tmp
+*.log
+screenshots/
+shots/
+.gitignore
+.vercelignore
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/

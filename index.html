@@ -14,10 +14,13 @@
   <link rel="icon" href="assets/favicon-64.png" type="image/png">
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 
-  <link rel="preload" href="assets/logo.webp" as="image" type="image/webp" fetchpriority="high">
+  <link rel="preload" href="assets/rose-poster.webp" as="image" type="image/webp" fetchpriority="high">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Italiana&display=swap">
+  <!-- The name's display face, subset to just the letters it uses (a few KB). -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700&display=swap&text=UFIEM%E2%80%99S%20GROV">
+  <!-- Bodoni Moda: "Coming Soon". Jost (thin): tagline, launch teaser, links. -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:wght@400&family=Jost:wght@200;300&display=swap">
   <link rel="stylesheet" href="styles.css">
 
   <!-- Enables the intro sequence. Without JS, everything renders in its final state. -->
@@ -25,6 +28,50 @@
   <script src="main.js" defer></script>
 </head>
 <body>
+  <!-- Petal artwork, drawn once and reused by every falling petal (see main.js → petals). -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <radialGradient id="pg-body-a" cx="50%" cy="30%" r="80%">
+        <stop offset="0" stop-color="#5a2290"/>
+        <stop offset=".45" stop-color="#2f0d52"/>
+        <stop offset=".8" stop-color="#150525"/>
+        <stop offset="1" stop-color="#07020c"/>
+      </radialGradient>
+      <radialGradient id="pg-body-b" cx="45%" cy="28%" r="82%">
+        <stop offset="0" stop-color="#3a1460"/>
+        <stop offset=".5" stop-color="#1a0630"/>
+        <stop offset="1" stop-color="#040107"/>
+      </radialGradient>
+      <linearGradient id="pg-base" x1="0" y1="0" x2="0" y2="1">
+        <stop offset=".55" stop-color="#000" stop-opacity="0"/>
+        <stop offset="1" stop-color="#000" stop-opacity=".75"/>
+      </linearGradient>
+      <linearGradient id="pg-sheen" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#d9c2ff" stop-opacity=".38"/>
+        <stop offset=".4" stop-color="#b28cff" stop-opacity=".08"/>
+        <stop offset="1" stop-color="#000" stop-opacity="0"/>
+      </linearGradient>
+      <!-- Cupped petal: ruffled rounded top, narrowing to the base. -->
+      <path id="pg-shape" d="M50 138C38 131 14 108 7 78 1 52 8 24 26 11c6-4 11-5 16-3 4 1 6 4 9 2 4-4 9-7 17-5 17 4 29 22 31 45 2 26-8 52-26 74-7 8-15 12-20 14z"/>
+      <symbol id="petal-a" viewBox="0 0 100 140">
+        <use href="#pg-shape" fill="url(#pg-body-a)"/>
+        <path d="M50 136C47 104 45 66 49 22M50 120C38 96 26 70 22 40M51 118C62 94 74 68 79 40" fill="none" stroke="#c9a6ff" stroke-opacity=".14" stroke-width=".9" stroke-linecap="round"/>
+        <path d="M24 24C34 46 38 80 40 112" fill="none" stroke="#000" stroke-opacity=".35" stroke-width="7" stroke-linecap="round"/>
+        <use href="#pg-shape" fill="url(#pg-sheen)"/>
+        <use href="#pg-shape" fill="url(#pg-base)"/>
+        <use href="#pg-shape" fill="none" stroke="#c7a2ff" stroke-opacity=".32" stroke-width="1.1"/>
+      </symbol>
+      <symbol id="petal-b" viewBox="0 0 100 140">
+        <use href="#pg-shape" fill="url(#pg-body-b)"/>
+        <path d="M50 136C48 104 47 66 50 22M50 118C40 96 30 70 26 42M51 116C61 94 71 68 76 42" fill="none" stroke="#b58cff" stroke-opacity=".12" stroke-width=".9" stroke-linecap="round"/>
+        <path d="M72 22C64 48 60 82 58 114" fill="none" stroke="#000" stroke-opacity=".4" stroke-width="8" stroke-linecap="round"/>
+        <use href="#pg-shape" fill="url(#pg-sheen)" opacity=".7"/>
+        <use href="#pg-shape" fill="url(#pg-base)"/>
+        <use href="#pg-shape" fill="none" stroke="#a77cf0" stroke-opacity=".28" stroke-width="1.1"/>
+      </symbol>
+    </defs>
+  </svg>
+
   <main class="stage">
 
     <!-- Atmosphere (decorative) -->
@@ -32,185 +79,63 @@
       <div class="env__base"></div>
       <div class="env__ambient env__ambient--a"></div>
       <div class="env__ambient env__ambient--b"></div>
-      <div class="env__halo layer" style="--depth: 10"></div>
-      <div class="env__shafts"></div>
       <div class="env__floor"></div>
-      <div class="fog fog--back layer" style="--depth: 16"></div>
       <canvas class="fx" id="fx"></canvas>
-      <div class="fog fog--front layer" style="--depth: 34"></div>
       <div class="env__vignette"></div>
       <div class="env__grain"></div>
     </div>
 
     <section class="hero">
-      <svg class="petal-defs" width="0" height="0" aria-hidden="true" focusable="false">
-        <defs>
-          <!-- Body: near-black at the base, deepening to purple towards the lip. -->
-          <linearGradient id="pt-body" x1="0" y1="1" x2="0" y2="0">
-            <stop offset="0" stop-color="#000"/>
-            <stop offset=".3" stop-color="#06020d"/>
-            <stop offset=".66" stop-color="#1a0739"/>
-            <stop offset=".9" stop-color="#341168"/>
-            <stop offset="1" stop-color="#43188a"/>
-          </linearGradient>
-          <!-- Soft inner shadow around the sides (the petal cups inward). -->
-          <radialGradient id="pt-cup" cx=".5" cy=".58" r=".62">
-            <stop offset=".45" stop-color="#000" stop-opacity="0"/>
-            <stop offset="1" stop-color="#000" stop-opacity=".62"/>
-          </radialGradient>
-          <!-- Velvety sheen where the petal bellies out. -->
-          <radialGradient id="pt-sheen" cx=".4" cy=".34" r=".48">
-            <stop offset="0" stop-color="#a77bff" stop-opacity=".26"/>
-            <stop offset="1" stop-color="#a77bff" stop-opacity="0"/>
-          </radialGradient>
-          <!-- Shadow cast by overlapping petals near the base. -->
-          <linearGradient id="pt-base" x1="0" y1="1" x2="0" y2="0">
-            <stop offset="0" stop-color="#000" stop-opacity=".9"/>
-            <stop offset=".42" stop-color="#000" stop-opacity="0"/>
-          </linearGradient>
-          <!-- The rolled outer lip catches the light. -->
-          <linearGradient id="pt-lip" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="#c7a6ff" stop-opacity=".55"/>
-            <stop offset="1" stop-color="#5a24b0" stop-opacity="0"/>
-          </linearGradient>
-          <linearGradient id="pt-rim" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0" stop-color="#d9c4ff" stop-opacity="0"/>
-            <stop offset=".3" stop-color="#d9c4ff" stop-opacity=".75"/>
-            <stop offset=".7" stop-color="#d9c4ff" stop-opacity=".75"/>
-            <stop offset="1" stop-color="#d9c4ff" stop-opacity="0"/>
-          </linearGradient>
-        </defs>
-      </svg>
+      <!-- The bloom. Nothing in here may create a stacking context on .bloom itself: the video uses
+           mix-blend-mode: screen to melt its black background into the page. -->
+      <div class="bloom" id="bloom">
+        <div class="bloom__pulse" aria-hidden="true"></div>
 
-      <!-- The rose. Bud base sits at (497, 1030) in the SVGs' 1000 × 1300 units, just below the
-           logo's divider, so the stem never crosses the lettering. Petals are generated by main.js:
-           back petals sit behind the logo, front petals in front of it, so the bloom reveals the name. -->
-      <div class="flower">
-        <div class="flower__glow" aria-hidden="true"></div>
-
-        <svg class="rose rose--back" id="rose-back" viewBox="0 0 1000 1300" aria-hidden="true" focusable="false">
-          <defs>
-            <linearGradient id="stem-fill" gradientUnits="userSpaceOnUse" x1="0" y1="1300" x2="0" y2="1040">
-              <stop offset="0" stop-color="#16301c" stop-opacity="0"/>
-              <stop offset=".35" stop-color="#16301c"/>
-              <stop offset="1" stop-color="#1d3d22"/>
-            </linearGradient>
-            <linearGradient id="stem-rim" gradientUnits="userSpaceOnUse" x1="0" y1="1300" x2="0" y2="1040">
-              <stop offset="0" stop-color="#a77bff" stop-opacity="0"/>
-              <stop offset=".4" stop-color="#a77bff" stop-opacity=".55"/>
-              <stop offset="1" stop-color="#c9b0ff" stop-opacity=".75"/>
-            </linearGradient>
-            <linearGradient id="leaf-fill" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stop-color="#0a1a0e"/>
-              <stop offset=".6" stop-color="#1c3a20"/>
-              <stop offset="1" stop-color="#335c34"/>
-            </linearGradient>
-            <linearGradient id="sepal-fill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stop-color="#2f5c2e"/>
-              <stop offset=".55" stop-color="#1b3b1e"/>
-              <stop offset="1" stop-color="#0b1e0f"/>
-            </linearGradient>
-            <!-- Petal fills: black with a deep-purple sheen across the middle. -->
-            <linearGradient id="bud-outer" x1="0" y1=".1" x2="1" y2=".4">
-              <stop offset="0" stop-color="#020005"/>
-              <stop offset=".45" stop-color="#12052a"/>
-              <stop offset=".62" stop-color="#1f0842"/>
-              <stop offset="1" stop-color="#030008"/>
-            </linearGradient>
-            <linearGradient id="bud-mid" x1="0" y1=".1" x2="1" y2=".4">
-              <stop offset="0" stop-color="#010003"/>
-              <stop offset=".55" stop-color="#1a0739"/>
-              <stop offset="1" stop-color="#04010a"/>
-            </linearGradient>
-            <linearGradient id="petal-shade" x1="0" y1="1" x2="0" y2="0">
-              <stop offset="0" stop-color="#000" stop-opacity=".85"/>
-              <stop offset=".45" stop-color="#000" stop-opacity="0"/>
-            </linearGradient>
-            <linearGradient id="bud-inner" x1="0" y1="1" x2="0" y2="0">
-              <stop offset="0" stop-color="#040008"/>
-              <stop offset=".65" stop-color="#25094d"/>
-              <stop offset="1" stop-color="#4a1c92"/>
-            </linearGradient>
-          </defs>
-
-          <g class="stem">
-            <!-- Drawn bottom-to-top so it grows up out of the dark. -->
-            <path class="stem__body" pathLength="1" d="M500 1300 C506 1250 491 1200 498 1140 S503 1075 497 1046"/>
-            <path class="stem__rim" pathLength="1" d="M503.5 1300 C509.5 1250 494.5 1200 501.5 1140 S506.5 1075 500.5 1046"/>
-            <g class="stem__leaf stem__leaf--l">
-              <path d="M496 1150 C462 1128 424 1132 392 1160 C432 1174 466 1170 496 1150Z" fill="url(#leaf-fill)" stroke="#7fb27a" stroke-opacity=".3" stroke-width="1.6"/>
-              <path d="M494 1151 C462 1152 432 1158 404 1162" fill="none" stroke="#9fd09a" stroke-opacity=".25" stroke-width="1.3"/>
-            </g>
-            <g class="stem__leaf stem__leaf--r">
-              <path d="M500 1215 C534 1192 572 1196 604 1222 C566 1238 530 1236 500 1215Z" fill="url(#leaf-fill)" stroke="#7fb27a" stroke-opacity=".3" stroke-width="1.6"/>
-              <path d="M502 1216 C534 1217 566 1221 592 1224" fill="none" stroke="#9fd09a" stroke-opacity=".25" stroke-width="1.3"/>
-            </g>
-            <g class="stem__thorns" fill="#16301c" stroke="#a77bff" stroke-opacity=".35" stroke-width="1.1">
-              <path d="M495 1260 L480 1251 L495 1247Z"/>
-              <path d="M501 1100 L515 1091 L501 1087Z"/>
-            </g>
-          </g>
-
-        </svg>
-
-        <!-- 3D petals (built by main.js). Back layer: inner ring + far-side petals, behind the logo. -->
-        <div class="bloom bloom--back" aria-hidden="true"><div class="bloom__scene" id="bloom-back"></div></div>
-
-        <h1 class="logo">
-          <span class="sr-only">Ufiem’s Groove</span>
-          <!-- Emblem + divider from the original artwork (its baked-in lettering is removed). -->
-          <picture>
-            <source srcset="assets/logo.webp" type="image/webp">
-            <img src="assets/logo.png" alt="" width="840" height="850" decoding="async" fetchpriority="high">
-          </picture>
-          <!-- Live wordmark, set in the same band the original lettering occupied.
-               viewBox = the artwork's source pixels; baseline y=857, width locked by textLength. -->
-          <svg class="logo__wordmark" viewBox="0 0 965 976" aria-hidden="true" focusable="false">
-            <defs>
-              <linearGradient id="wordmark-silver" gradientUnits="userSpaceOnUse" x1="0" y1="811" x2="0" y2="857">
-                <stop offset="0" stop-color="#f8f7fc"/>
-                <stop offset=".45" stop-color="#dcd8e6"/>
-                <stop offset=".62" stop-color="#b3adc2"/>
-                <stop offset="1" stop-color="#e6e2ef"/>
-              </linearGradient>
-            </defs>
-            <text x="482.5" y="857" text-anchor="middle" textLength="884" lengthAdjust="spacing" fill="url(#wordmark-silver)">UFIEM’S GROOVE</text>
-          </svg>
+        <!-- The name sits *under* the screen-blended flower, so while it is small and blurred it
+             reads as light glowing inside the bud; main.js grows it in step with the video. -->
+        <h1 class="name" id="name">
+          <span class="name__inner">
+            <img class="name__emblem" src="assets/emblem.webp" alt="" width="256" height="238" decoding="async">
+            <span class="name__text">UFIEM’S GROOVE</span>
+          </span>
         </h1>
 
-        <!-- Front layer: near-side petals, in front of the logo until they peel open. -->
-        <div class="bloom bloom--front" aria-hidden="true"><div class="bloom__scene" id="bloom-front"></div></div>
-
-        <svg class="rose rose--front" id="rose-front" viewBox="0 0 1000 1300" aria-hidden="true" focusable="false">
-          <!-- Sepals + receptacle: green, like the reference bud. They stay with the stem. -->
-          <g class="calyx" fill="url(#sepal-fill)" stroke="#8cc486" stroke-opacity=".32" stroke-width="1.4" stroke-linejoin="round">
-            <path d="M497 1032 C468 1022 428 1012 384 1024 C424 1036 462 1042 497 1040Z"/>
-            <path d="M497 1032 C526 1022 566 1012 610 1024 C570 1036 532 1042 497 1040Z"/>
-            <path d="M497 1038 C470 1052 442 1072 422 1098 C454 1084 478 1064 497 1046Z"/>
-            <path d="M497 1038 C524 1052 552 1072 572 1098 C540 1084 516 1064 497 1046Z"/>
-            <path d="M497 1036 C486 1014 488 998 497 986 C506 998 508 1014 497 1036Z"/>
-            <ellipse cx="497" cy="1042" rx="21" ry="15"/>
-          </g>
-        </svg>
+        <div class="bloom__media" aria-hidden="true">
+          <video class="bloom__video" id="bloom-video" src="assets/rose-bloom.mp4" poster="assets/rose-poster.webp"
+                 muted playsinline preload="auto" disablepictureinpicture disableremoteplayback tabindex="-1"></video>
+          <!-- Last frame, shown instead of the video for reduced motion or when it can't play. -->
+          <img class="bloom__still" src="assets/rose-end.webp" alt="" width="960" height="960" decoding="async">
+        </div>
       </div>
 
-      <p class="headline">
-        <span class="sr-only">Coming Soon</span>
-        <span class="headline__letters" aria-hidden="true"><span class="headline__word"><span style="--i:0">C</span><span style="--i:1">o</span><span style="--i:2">m</span><span style="--i:3">i</span><span style="--i:4">n</span><span style="--i:5">g</span></span> <span class="headline__word"><span style="--i:6">S</span><span style="--i:7">o</span><span style="--i:8">o</span><span style="--i:9">n</span></span></span>
-      </p>
+      <!-- Falling petals (filled by main.js after the bloom). -->
+      <div class="petals" id="petals" aria-hidden="true"></div>
 
-      <p class="tagline">Something extraordinary is taking shape.</p>
+      <div class="copy">
+        <p class="headline">
+          <span class="sr-only">Coming Soon</span>
+          <span class="headline__letters" aria-hidden="true"><span class="headline__word"><span style="--i:0">C</span><span style="--i:1">O</span><span style="--i:2">M</span><span style="--i:3">I</span><span style="--i:4">N</span><span style="--i:5">G</span></span><span class="headline__space"> </span><span class="headline__word"><span style="--i:6">S</span><span style="--i:7">O</span><span style="--i:8">O</span><span style="--i:9">N</span></span></span>
+        </p>
+
+        <p class="tagline">Something extraordinary is taking shape.</p>
+
+        <p class="announce">
+          <span class="announce__line" aria-hidden="true"></span>
+          <span class="announce__text">Launch date<span class="announce__gem" aria-hidden="true"></span>to be announced<span class="announce__dots" aria-hidden="true"><i></i><i></i><i></i></span></span>
+          <span class="announce__line" aria-hidden="true"></span>
+        </p>
+      </div>
     </section>
 
     <ul class="social" aria-label="Contact">
-      <li>
+      <li style="--k:0">
         <a href="https://x.com/0xrhydar" target="_blank" rel="noopener noreferrer">
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
           <span><span class="sr-only">X: </span>@0xrhydar</span>
         </a>
       </li>
-      <li class="social__sep" aria-hidden="true"></li>
-      <li>
+      <li class="social__sep" aria-hidden="true" style="--k:1"></li>
+      <li style="--k:2">
         <a href="mailto:dacryptoethss@gmail.com">
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" d="M3.5 5.75h17v12.5h-17zM3.5 6.5l8.5 6.5 8.5-6.5"/></svg>
           <span><span class="sr-only">Email: </span>dacryptoethss@gmail.com</span>

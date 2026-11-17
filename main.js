@@ -1,301 +1,156 @@
 /* UFIEM’S GROOVE — intro sequence + ambient atmosphere
  *
- * 1. The stem grows up out of the dark and a closed, black-and-purple rosebud rises onto it.
- * 2. The bud opens petal by petal in 3D (≈ 5s); the name grows out from inside the flower.
- * 3. The petals come loose and drift down. The stem and green sepals stay standing, just
- *    below the logo, so they never cross the lettering.
- * 4. "Coming Soon" writes itself in under the stem, then the tagline, then the contact links.
- * 5. Ambient motion takes over: floating violet motes, a breathing glow, gentle parallax.
+ * 1. A time-lapse of a flower blooming plays (muted, inline, once). It's tinted and screen-blended
+ *    in CSS so its black background vanishes. Embers and a heartbeat glow rise behind it.
+ * 2. The video's timeupdate cues each stage. As the bud opens, the name grows out of its centre:
+ *    tiny, blurred and glowing at first, full size and sharp once the petals are open (--np, 0 → 1,
+ *    is read from video.currentTime every frame so the growth is smooth).
+ * 3. "COMING SOON" reveals letter by letter with a shimmer, then the tagline, the
+ *    "Launch date — to be announced" teaser and the links.
+ * 4. When the video ends it holds its last frame, the flower settles back and petals start to fall.
  *
- * Each stage is a class on <html> (styled in styles.css); petals are animated with the
- * Web Animations API. With prefers-reduced-motion the page skips straight to the final
- * state with simple fades.
+ * Each stage is a class on <html> (styled in styles.css). With prefers-reduced-motion — or if the
+ * video can't play — the page shows the final screen, still.
  */
 (() => {
   'use strict';
 
   const root = document.documentElement;
   const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-  const SVGNS = 'http://www.w3.org/2000/svg';
 
   const rand = (a, b) => a + Math.random() * (b - a);
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const smooth = (x) => { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); };
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const step = (name) => root.classList.add(name);
-  const STAGES = ['is-stem', 'is-bloom', 'is-logo', 'is-fall', 'is-title', 'is-tagline', 'is-social', 'is-ambient'];
+  const FINAL = ['is-video', 'is-emerge', 'is-named', 'is-title', 'is-tagline', 'is-announce', 'is-social', 'is-end'];
+
+  const video = document.getElementById('bloom-video');
+  const bloom = document.getElementById('bloom');
+
+  /* Cue points, in seconds of *video* time (the clip is 15.6 s; it plays at RATE). */
+  const RATE = 1.3;
+  const CUES = {
+    emerge: 1.6,   // the sepals start to split: the name begins to glow inside the bud
+    named: 7.2,    // petals open: the name is full size and sharp
+    title: 7.6,    // COMING SOON
+    tagline: 9.4,
+    announce: 10.8,
+    social: 12.2,
+  };
+  const STALL_MS = 6000; // no progress for this long → give up and show the final screen
 
   /* ======================================================================
-     The rose — 18 petals in three rings, posed with CSS 3D transforms
+     COMING SOON: give every letter its slice of one shared gradient
      ====================================================================== */
 
-  const scenes = {
-    back: document.getElementById('bloom-back'),   // inner ring + far side: behind the logo
-    front: document.getElementById('bloom-front'), // near side: in front of the logo
-  };
-  const flowerEl = document.querySelector('.flower');
-
-  /* Sizes in drawing units (the 1000-wide flower; inside a scene 1em = 100 units).
-     lean: inward tilt when closed (deg) — tops converge into the bud's teardrop.
-     open: outward tilt when bloomed (deg) — the outer ring curls back past horizontal.
-     at / dur: ring timing in ms; each petal adds its own jitter so they peel one by one. */
-  // cup / cupOpen: how far each half of the petal folds inward (deg) — tight in the bud, relaxed when open.
-  const RINGS = [
-    // hMin: shortest petal as a share of h; roll: diagonal tilt (deg) so wrapped edges cross the bud.
-    { n: 5, h: 340, w: 150, r: 16, lean: 24, open: 26, rOpen: 30, cup: 34, cupOpen: 22, hMin: .95, roll: 6,  at: 2600, dur: 2400 }, // inner
-    { n: 6, h: 365, w: 220, r: 36, lean: 14, open: 72, rOpen: 66, cup: 28, cupOpen: 14, hMin: .86, roll: 7,  at: 1250, dur: 2700 }, // middle
-    { n: 7, h: 345, w: 265, r: 52, lean: 8,  open: 94, rOpen: 96, cup: 22, cupOpen: 8,  hMin: .74, roll: 10, at: 0,    dur: 3000 }, // outer
-  ];
-
-  // One petal's artwork in a 100 × 130 box: base at the bottom centre (50, 130), widest near
-  // the top, with a soft wavy lip. Each petal gets its own jitter so no two are alike.
-  function petalArt() {
-    const j = (v, a) => +(v + rand(-a, a) * 0.6).toFixed(1);
-    // Wavy top edge, right to left.
-    const R = [j(93, 2), j(28, 3)];
-    const t1 = [j(70, 3), j(6, 2.5)];
-    const mid = [j(50, 2), j(5, 3)];
-    const t2 = [j(30, 3), j(6, 2.5)];
-    const L = [j(7, 2), j(28, 3)];
-    const topEdge =
-      `C${j(91, 2)} ${j(15, 3)} ${j(81, 3)} ${j(5, 2)} ${t1[0]} ${t1[1]} ` +
-      `C${j(62, 2)} ${j(7, 2)} ${j(57, 2)} ${j(2, 2)} ${mid[0]} ${mid[1]} ` +
-      `C${j(43, 2)} ${j(2, 2)} ${j(38, 2)} ${j(7, 2)} ${t2[0]} ${t2[1]} ` +
-      `C${j(19, 3)} ${j(5, 2)} ${j(9, 2)} ${j(15, 3)} ${L[0]} ${L[1]}`;
-    const outline =
-      `M50 130 C${j(62, 2)} 126 ${j(79, 3)} ${j(112, 3)} ${j(87, 3)} ${j(92, 3)} ` +
-      `C${j(96, 2)} ${j(72, 3)} ${j(99, 2)} ${j(47, 3)} ${R[0]} ${R[1]} ` +
-      topEdge +
-      ` C${j(1, 2)} ${j(47, 3)} ${j(4, 2)} ${j(72, 3)} ${j(13, 3)} ${j(92, 3)} ` +
-      `C${j(21, 3)} ${j(112, 3)} ${j(38, 2)} 126 50 130Z`;
-    // Rolled lip: the top edge plus a parallel curve a little lower, filled with a light gradient.
-    const lip = `M${R[0]} ${R[1]} ${topEdge} ` +
-      `C${L[0] + 4} ${L[1] - 2} ${t2[0]} ${t2[1] + 9} ${mid[0]} ${mid[1] + 8} ` +
-      `C${t1[0]} ${t1[1] + 9} ${R[0] - 4} ${R[1] - 2} ${R[0]} ${R[1]}Z`;
-    const rim = `M${R[0]} ${R[1]} ${topEdge}`;
-    let veins = '';
-    for (let i = 0; i < 7; i++) {
-      const xe = 14 + i * 12 + rand(-3, 3);
-      veins += `M50 127 Q${(50 + (xe - 50) * 0.35).toFixed(1)} ${j(72, 8)} ${xe.toFixed(1)} ${j(20, 6)} `;
-    }
-    return `<path d="${outline}" fill="url(#pt-body)"/>` +
-      `<path d="${outline}" fill="url(#pt-sheen)"/>` +
-      `<path class="pt-veins" d="${veins}"/>` +
-      `<path d="${outline}" fill="url(#pt-cup)"/>` +
-      `<path d="${outline}" fill="url(#pt-base)"/>` +
-      `<path d="${lip}" fill="url(#pt-lip)"/>` +
-      `<path class="pt-rim" d="${rim}"/>` +
-      `<path class="pt-shade" d="${outline}"/>` +
-      `<path class="pt-edge" d="${outline}"/>`;
-  }
-
-  // A petal is folded down its midline into two halves hinged in 3D, so it really cups.
-  // Both halves show the same artwork through different halves of the viewBox.
-  const petalHalves = (art) =>
-    `<div class="ph ph--l"><svg viewBox="0 0 50 130" preserveAspectRatio="none" focusable="false">${art}</svg></div>` +
-    `<div class="ph ph--r"><svg viewBox="50 0 50 130" preserveAspectRatio="none" focusable="false">${art}</svg></div>`;
-  const fold = (deg) => [`rotateY(${(-deg).toFixed(2)}deg)`, `rotateY(${deg.toFixed(2)}deg)`];
-
-  /* Every pose uses the same list of transform functions so keyframes interpolate cleanly:
-       translate3d (world drift, for falling) → rotateY (place around the stem) → translateZ
-       (ring radius) → rotateY (yaw: overlap/spiral) → rotateX (lean in / peel out) → rotateZ
-       → tumble about the petal's middle → scale. */
-  const pose = (q) =>
-    `translate3d(${q.tx.toFixed(1)}px, ${q.ty.toFixed(1)}px, ${q.tz.toFixed(1)}px) ` +
-    `rotateY(${q.az.toFixed(2)}deg) translateZ(${(q.r / 100).toFixed(3)}em) ` +
-    `rotateY(${q.yaw.toFixed(2)}deg) rotateX(${q.tilt.toFixed(2)}deg) rotateZ(${q.roll.toFixed(2)}deg) ` +
-    `translateY(${(-q.half / 100).toFixed(3)}em) rotateX(${q.ax.toFixed(1)}deg) rotateY(${q.ay.toFixed(1)}deg) ` +
-    `rotateZ(${q.azz.toFixed(1)}deg) translateY(${(q.half / 100).toFixed(3)}em) scale(${q.s.toFixed(3)})`;
-
-  const still = { tx: 0, ty: 0, tz: 0, ax: 0, ay: 0, azz: 0 };
-  let petals = [];
-
-  function buildBud() {
-    RINGS.forEach((ring, ri) => {
-      const offset = ri * (180 / ring.n) + rand(-8, 8);
-      for (let i = 0; i < ring.n; i++) {
-        const az = offset + (i * 360) / ring.n + rand(-7, 7);
-        const front = ri > 0 && Math.cos(az * Math.PI / 180) > 0.05;
-        const h = ring.h * rand(ring.hMin, 1.03);
-        const w = ring.w * rand(0.92, 1.08);
-        const el = document.createElement('div');
-        el.className = 'petal3d';
-        el.style.width = `${w / 100}em`;
-        el.style.height = `${h / 100}em`;
-        el.style.left = `${-w / 200}em`;
-        // Petals turned away from the light are darker.
-        el.style.setProperty('--shade', (0.08 + 0.32 * (1 - Math.cos(az * Math.PI / 180)) / 2).toFixed(2));
-        el.innerHTML = petalHalves(petalArt());
-        const halves = el.querySelectorAll('.ph');
-        const p = {
-          el, ring: ri, h, half: h / 2,
-          halves,
-          cup: ring.cup + rand(-4, 4),
-          cupOpen: ring.cupOpen + rand(-4, 4),
-          closed: { ...still, az, r: ring.r, yaw: rand(-8, 8), tilt: ring.lean + rand(-2, 2), roll: rand(-ring.roll, ring.roll), half: h / 2, s: 1 },
-          open: {
-            ...still,
-            az: az + rand(-6, 6),
-            r: ring.rOpen,
-            yaw: rand(-8, 8),
-            tilt: -(ring.open + rand(-8, 8)),
-            roll: rand(-10, 10),
-            half: h / 2,
-            s: rand(1.04, 1.12),
-          },
-          at: ring.at + i * rand(110, 190) + rand(0, 160),
-          dur: ring.dur * rand(0.9, 1.1),
-        };
-        el.style.transform = pose(p.closed);
-        fold(p.cup).forEach((t, k) => { halves[k].style.transform = t; });
-        scenes[front ? 'front' : 'back'].appendChild(el);
-        petals.push(p);
-      }
+  const letters = document.querySelector('.headline__letters');
+  function measureHeadline() {
+    if (!letters) return;
+    letters.style.setProperty('--hw', `${letters.offsetWidth}px`);
+    letters.querySelectorAll('.headline__word > span').forEach((s) => {
+      s.style.setProperty('--x', s.offsetLeft);   // offsetParent is .headline__letters
     });
-  }
-
-  // Each petal peels back on its hinge: it first loosens, then curls outward in 3D.
-  function bloom() {
-    for (const p of petals) {
-      const c = p.closed, o = p.open;
-      const mid = {
-        ...still,
-        az: c.az + (o.az - c.az) * 0.4,
-        r: c.r + (o.r - c.r) * 0.35,
-        yaw: c.yaw * 0.6 + o.yaw * 0.4,
-        tilt: c.tilt + (o.tilt - c.tilt) * 0.38,
-        roll: c.roll + (o.roll - c.roll) * 0.5,
-        half: c.half,
-        s: 1 + (o.s - 1) * 0.5,
-      };
-      const timing = { duration: p.dur, delay: p.at, easing: 'cubic-bezier(.42, 0, .3, 1)', fill: 'forwards' };
-      p.el.animate([{ transform: pose(c) }, { transform: pose(mid), offset: 0.42 }, { transform: pose(o) }], timing);
-      // The petal relaxes as it opens: its fold eases from a tight cup to a gentle curve.
-      const a = fold(p.cup), b = fold(p.cupOpen);
-      p.halves.forEach((h, k) => h.animate([{ transform: a[k] }, { transform: b[k] }], timing));
-    }
-  }
-
-  // Petals let go — outer ring first — and drift down in 3D: swaying, tumbling slowly about
-  // their middle, fading as they reach the ground. The stem and sepals stay standing.
-  function fall() {
-    const base = flowerEl.getBoundingClientRect();
-    const baseY = base.top + base.height * 0.7923;
-    const N = 20;
-    const order = petals.slice().sort((a, b) => b.ring - a.ring || a.at - b.at);
-
-    order.forEach((p, i) => {
-      const o = p.open;
-      const drop = window.innerHeight - baseY + base.width * 0.25;
-      const side = Math.sin(o.az * Math.PI / 180) || rand(-1, 1);
-      const dx = side * rand(40, 160) + rand(-40, 40);
-      const dz = rand(-60, 120);
-      const sway = rand(18, 46);
-      const swayCycles = rand(1.2, 2.4);
-      const spinX = rand(70, 220) * (Math.random() < 0.5 ? -1 : 1);
-      const spinY = rand(90, 260) * (Math.random() < 0.5 ? -1 : 1);
-      const spinZ = rand(30, 120) * (Math.random() < 0.5 ? -1 : 1);
-
-      const frames = [];
-      for (let k = 0; k <= N; k++) {
-        const t = k / N;
-        const ease = t * t * (1.6 - 0.6 * t); // drifts off gently, then settles into a slow fall
-        frames.push({
-          transform: pose({
-            ...o,
-            tx: dx * t + Math.sin(t * Math.PI * swayCycles) * sway,
-            ty: drop * ease,
-            tz: dz * t,
-            ax: spinX * t,
-            ay: spinY * t + Math.sin(t * Math.PI * 2) * 25,
-            azz: spinZ * t,
-          }),
-          opacity: t < 0.72 ? 1 : 1 - (t - 0.72) / 0.28,
-        });
-      }
-      const anim = p.el.animate(frames, {
-        duration: rand(6500, 9000),
-        delay: i * 150 + rand(0, 250),
-        easing: 'linear',
-        fill: 'forwards',
-      });
-      anim.finished.then(() => p.el.remove(), () => {});
-    });
-    petals = [];
   }
 
   /* ======================================================================
-     Ambient atmosphere: floating motes + parallax (starts after the intro)
+     Embers + parallax (pointer and device tilt)
      ====================================================================== */
 
   const canvas = document.getElementById('fx');
   const ctx = canvas && canvas.getContext('2d');
 
   let W = 0, H = 0, DPR = 1;
-  let motes = [];
-  let t = 0, last = 0, raf = 0, ambientOn = false;
-  let lastPointerMove = -1e9;
+  let embers = [];
+  let t = 0, last = 0, raf = 0;
+  let lastInput = -1e9;
   const par = { x: 0, y: 0, tx: 0, ty: 0 };
+  const ptr = { x: -1e4, y: -1e4 };
 
-  const MOTE = (() => {
+  const sprite = (stops) => {
     const c = document.createElement('canvas');
     c.width = c.height = 64;
     const g = c.getContext('2d');
     const r = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-    r.addColorStop(0, 'rgba(246,238,255,1)');
-    r.addColorStop(0.16, 'rgba(204,168,255,.85)');
-    r.addColorStop(0.42, 'rgba(140,82,255,.22)');
-    r.addColorStop(1, 'rgba(110,50,230,0)');
+    stops.forEach(([o, col]) => r.addColorStop(o, col));
     g.fillStyle = r;
     g.fillRect(0, 0, 64, 64);
     return c;
-  })();
+  };
+  const SPRITES = [
+    sprite([[0, 'rgba(255,246,255,1)'], [0.14, 'rgba(214,170,255,.9)'], [0.4, 'rgba(146,80,255,.25)'], [1, 'rgba(110,50,230,0)']]),
+    sprite([[0, 'rgba(255,230,255,1)'], [0.12, 'rgba(232,140,255,.85)'], [0.42, 'rgba(170,60,230,.2)'], [1, 'rgba(120,30,200,0)']]),
+  ];
 
-  const makeMote = () => {
+  const makeEmber = (anywhere) => {
     const z = 0.2 + Math.random() * 0.8;
     return {
       x: Math.random() * W,
-      y: Math.random() * H,
+      y: anywhere ? Math.random() * H : H + rand(10, 60),
       z,
-      vx: rand(-5, 5),
-      vy: -rand(3, 13) * z,
-      s: 3 + z * z * 11,
-      a: 0.25 + z * 0.65,
+      vx: rand(-4, 4),
+      vy: -rand(8, 26) * (0.4 + z * 0.6),
+      px: 0, py: 0,                         // push from the pointer (decays)
+      s: 2.5 + z * z * 10,
+      a: 0.3 + z * 0.65,
       ph: Math.random() * Math.PI * 2,
-      tw: rand(0.4, 1.6),
+      tw: rand(1.5, 4),                     // flicker speed
+      sp: SPRITES[Math.random() < 0.3 ? 1 : 0],
     };
   };
 
   function resize() {
     if (!ctx) return;
-    DPR = Math.min(window.devicePixelRatio || 1, 1.5); // soft glows don't need retina density
+    DPR = Math.min(window.devicePixelRatio || 1, 1.5);
     W = window.innerWidth;
     H = window.innerHeight;
     canvas.width = Math.round(W * DPR);
     canvas.height = Math.round(H * DPR);
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    const n = Math.round(clamp((W * H) / 9000, 30, 140));
-    while (motes.length < n) motes.push(makeMote());
-    motes.length = n;
-    for (const m of motes) { if (m.x > W) m.x = Math.random() * W; if (m.y > H) m.y = Math.random() * H; }
-    if (!raf) draw(0);
+    const n = Math.round(clamp((W * H) / 11000, 28, 120));
+    while (embers.length < n) embers.push(makeEmber(true));
+    embers.length = n;
   }
 
   function draw(dt) {
     ctx.clearRect(0, 0, W, H);
     ctx.globalCompositeOperation = 'lighter';
-    const ox = par.x * 26, oy = par.y * 14;
-    for (const m of motes) {
+    const ox = par.x * 30, oy = par.y * 18;
+    const wind = par.x * 14;               // tilt / pointer leans the column of embers
+    for (const m of embers) {
       if (dt) {
-        m.x += (m.vx + Math.sin(t * 0.3 + m.ph) * 6) * dt;
-        m.y += m.vy * dt;
-        if (m.y < -20) { m.y = H + 20; m.x = Math.random() * W; }
-        if (m.x < -20) m.x = W + 20; else if (m.x > W + 20) m.x = -20;
+        // Pointer: embers within ~140px drift away from it.
+        const dx = m.x + ox * m.z - ptr.x, dy = m.y + oy * m.z - ptr.y;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < 19600 && d2 > 1) {
+          const f = (1 - Math.sqrt(d2) / 140) * 90 * dt;
+          const d = Math.sqrt(d2);
+          m.px += (dx / d) * f;
+          m.py += (dy / d) * f;
+        }
+        m.px *= 1 - dt * 1.8;
+        m.py *= 1 - dt * 1.8;
+        m.x += (m.vx + wind * m.z + Math.sin(t * 0.6 + m.ph) * 7 + m.px) * dt;
+        m.y += (m.vy + m.py) * dt;
+        if (m.y < -30) Object.assign(m, makeEmber(false));
+        if (m.x < -30) m.x = W + 30; else if (m.x > W + 30) m.x = -30;
       }
-      ctx.globalAlpha = m.a * (0.55 + 0.45 * Math.sin(t * m.tw + m.ph));
-      ctx.drawImage(MOTE, m.x + ox * m.z - m.s / 2, m.y + oy * m.z - m.s / 2, m.s, m.s);
+      // Fade out towards the top, flicker like a cinder.
+      const life = clamp(m.y / (H * 0.35), 0, 1);
+      const flick = 0.6 + 0.4 * Math.sin(t * m.tw + m.ph) * Math.sin(t * m.tw * 0.37 + m.ph * 2);
+      ctx.globalAlpha = m.a * flick * life;
+      ctx.drawImage(m.sp, m.x + ox * m.z - m.s / 2, m.y + oy * m.z - m.s / 2, m.s, m.s);
     }
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
+  }
+
+  /* ---- Name emergence, read straight from the video clock each frame ---- */
+  let emerging = false;
+  let np = 0;
+  function setNP(v) {
+    np = v;
+    if (bloom) bloom.style.setProperty('--np', v.toFixed(4));
   }
 
   function frame(now) {
@@ -306,54 +161,158 @@
     dt = Math.min(dt, 0.05);
     t += dt;
 
-    // Idle drift when there's no mouse (touch devices, or a still pointer).
-    if (now - lastPointerMove > 3500) {
-      par.tx = Math.sin(t * 0.13) * 0.35;
-      par.ty = Math.cos(t * 0.1) * 0.25;
+    if (emerging && video) {
+      const p = smooth((video.currentTime - CUES.emerge) / (CUES.named - CUES.emerge));
+      if (p > np) setNP(p);
     }
-    const k = 1 - Math.exp(-dt * 2.4);
+
+    // Idle drift when there's no pointer or tilt input.
+    if (now - lastInput > 3500) {
+      par.tx = Math.sin(t * 0.13) * 0.3;
+      par.ty = Math.cos(t * 0.1) * 0.2;
+    }
+    const k = 1 - Math.exp(-dt * 2.6);
     par.x += (par.tx - par.x) * k;
     par.y += (par.ty - par.y) * k;
     root.style.setProperty('--px', par.x.toFixed(4));
     root.style.setProperty('--py', par.y.toFixed(4));
 
-    draw(dt);
+    if (ctx) draw(dt);
   }
 
   const startLoop = () => {
-    if (!ctx || !ambientOn || raf || reducedMotion.matches || document.hidden) return;
+    if (raf || reducedMotion.matches || document.hidden) return;
     last = performance.now();
     raf = requestAnimationFrame(frame);
   };
+  const stopLoop = () => { cancelAnimationFrame(raf); raf = 0; };
 
-  const stopLoop = () => {
-    cancelAnimationFrame(raf);
-    raf = 0;
-  };
+  /* ---- Input ---- */
+  window.addEventListener('pointermove', (e) => {
+    if (e.pointerType !== 'mouse') return;
+    lastInput = performance.now();
+    ptr.x = e.clientX;
+    ptr.y = e.clientY;
+    par.tx = (e.clientX / window.innerWidth) * 2 - 1;
+    par.ty = (e.clientY / window.innerHeight) * 2 - 1;
+  }, { passive: true });
+  document.addEventListener('mouseleave', () => { lastInput = -1e9; ptr.x = ptr.y = -1e4; });
 
-  function startAmbient() {
-    ambientOn = true;
-    resize();
-    startLoop();
+  // Device tilt (phones). iOS asks permission, which must come from a tap.
+  let tiltBase = null;
+  function onTilt(e) {
+    if (e.gamma == null || e.beta == null) return;
+    if (tiltBase === null) tiltBase = e.beta;
+    lastInput = performance.now();
+    par.tx = clamp(e.gamma / 30, -1, 1);
+    par.ty = clamp((e.beta - tiltBase) / 30, -1, 1);
+  }
+  if ('DeviceOrientationEvent' in window) {
+    const DOE = window.DeviceOrientationEvent;
+    if (typeof DOE.requestPermission === 'function') {
+      const ask = () => {
+        DOE.requestPermission().then((s) => {
+          if (s === 'granted') window.addEventListener('deviceorientation', onTilt, { passive: true });
+        }).catch(() => {});
+      };
+      window.addEventListener('pointerup', ask, { once: true });
+    } else {
+      window.addEventListener('deviceorientation', onTilt, { passive: true });
+    }
+  }
+
+  /* ======================================================================
+     Falling petals
+     ====================================================================== */
+
+  const petalLayer = document.getElementById('petals');
+  let petalsOn = false;
+  let activePetals = 0;
+
+  function spawnPetal(delay = 0) {
+    if (!petalLayer || !bloom || document.hidden) return;
+    const r = bloom.getBoundingClientRect();
+    const F = r.width;
+    const unit = clamp(F / 480, 0.55, 1.25);
+
+    // Start somewhere in the lower half of the flower head (centre ≈ 49% / 54% of the frame).
+    const x0 = r.left + F * (0.49 + rand(-0.26, 0.26));
+    const y0 = r.top + F * (0.55 + rand(-0.06, 0.14));
+    const yEnd = window.innerHeight * rand(0.84, 0.98);
+    const size = rand(18, 42) * unit;
+    const drift = rand(-0.35, 0.35) * F;
+    const amp = rand(16, 48) * unit;
+    const cycles = rand(1.4, 2.6);
+    const phase = rand(0, Math.PI * 2);
+    const depth = rand(-120, 80);
+    const dur = rand(7500, 12500) * clamp((yEnd - y0) / 600, 0.7, 1.4);
+
+    const el = document.createElement('div');
+    el.className = 'petal';
+    el.style.width = `${size}px`;
+    el.style.height = `${size * 1.4}px`;
+    el.innerHTML = `<div class="petal__spin"><svg viewBox="0 0 100 140"><use href="#petal-${Math.random() < 0.55 ? 'a' : 'b'}"/></svg></div>`;
+    petalLayer.appendChild(el);
+    activePetals++;
+
+    // Path: a short pause on the flower, then a drifting, swaying fall that slows as it lands.
+    const N = 14;
+    const fall = [];
+    for (let i = 0; i <= N; i++) {
+      const f = i / N;
+      const g = f < 0.08 ? f * 0.2 : 0.016 + (f - 0.08) / 0.92 * 0.984;   // lingers, then falls
+      const land = 1 - Math.pow(1 - g, 1.25);                             // eases onto the floor
+      const sway = Math.sin(f * cycles * Math.PI * 2 + phase) * amp * (1 - f * 0.6);
+      const x = x0 + drift * land + sway - size / 2;
+      const y = y0 + (yEnd - y0) * land - size * 0.7;
+      const z = depth + Math.sin(f * Math.PI * 1.5 + phase) * 40;
+      const opacity = f < 0.06 ? f / 0.06 : f > 0.84 ? (1 - f) / 0.16 : 1;
+      fall.push({ transform: `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, ${z.toFixed(1)}px)`, opacity });
+    }
+
+    // Tumbling: rotations accumulate unevenly, then the petal settles almost flat on the floor.
+    const spin = [];
+    let rx = rand(-30, 30), ry = rand(-40, 40), rz = rand(0, 360);
+    const vrz = rand(-260, 260), vrx = rand(200, 520) * (Math.random() < 0.5 ? -1 : 1), vry = rand(-300, 300);
+    for (let i = 0; i <= N; i++) {
+      const f = i / N;
+      const settle = f > 0.86 ? (f - 0.86) / 0.14 : 0;
+      const tx = rx + vrx * f + Math.sin(f * 9 + phase) * 30;
+      spin.push({
+        transform: `rotateZ(${(rz + vrz * f).toFixed(1)}deg) rotateX(${(tx * (1 - settle) + 72 * settle).toFixed(1)}deg) rotateY(${(ry + vry * f).toFixed(1)}deg)`,
+      });
+    }
+
+    const opts = { duration: dur, delay, easing: 'linear', fill: 'both' };
+    const a = el.animate(fall, opts);
+    el.firstElementChild.animate(spin, opts);
+    a.onfinish = () => { el.remove(); activePetals--; };
+  }
+
+  function startPetals() {
+    if (petalsOn || reducedMotion.matches || !petalLayer) return;
+    petalsOn = true;
+    const small = window.innerWidth < 600;
+    const burst = small ? 7 : 12;
+    for (let i = 0; i < burst; i++) spawnPetal(rand(0, 4500) + i * 180);
+    // Then a gentle, endless trickle.
+    const max = small ? 9 : 14;
+    (function trickle() {
+      setTimeout(() => {
+        if (!reducedMotion.matches && activePetals < max) spawnPetal();
+        trickle();
+      }, rand(2200, 5200));
+    })();
   }
 
   /* ======================================================================
      Events
      ====================================================================== */
 
-  window.addEventListener('pointermove', (e) => {
-    if (e.pointerType !== 'mouse') return;
-    lastPointerMove = performance.now();
-    par.tx = (e.clientX / window.innerWidth) * 2 - 1;
-    par.ty = (e.clientY / window.innerHeight) * 2 - 1;
-  }, { passive: true });
-
-  document.addEventListener('mouseleave', () => { lastPointerMove = -1e9; });
-
   let resizeTimer = 0;
   window.addEventListener('resize', () => {
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(resize, 120);
+    resizeTimer = setTimeout(() => { resize(); measureHeadline(); if (!raf && ctx) draw(0); }, 120);
   }, { passive: true });
 
   document.addEventListener('visibilitychange', () => (document.hidden ? stopLoop() : startLoop()));
@@ -364,7 +323,7 @@
       par.x = par.y = 0;
       root.style.setProperty('--px', '0');
       root.style.setProperty('--py', '0');
-      if (ctx) draw(0);
+      finalScreen();
     } else {
       startLoop();
     }
@@ -381,42 +340,81 @@
      ====================================================================== */
 
   function ready() {
-    const img = document.querySelector('.logo img');
     const fonts = document.fonts ? document.fonts.ready : Promise.resolve();
-    const logo = img && img.decode ? img.decode().catch(() => {}) : Promise.resolve();
-    return Promise.race([Promise.all([fonts, logo]), wait(2500)]);
+    return Promise.race([fonts, wait(2500)]);
+  }
+
+  let finished = false;
+  // Final screen without the video: the last frame as a still, the name in place, nothing moving
+  // except (when motion is allowed) the ambient layer and the petals.
+  function finalScreen() {
+    if (finished) return;
+    finished = true;
+    emerging = false;
+    if (video) { video.pause(); video.removeAttribute('src'); video.load(); }
+    setNP(1);
+    step('is-still');
+    FINAL.forEach(step);
+    if (reducedMotion.matches) {
+      if (ctx) draw(0);          // one still frame of embers
+    } else {
+      startLoop();
+      startPetals();
+    }
+  }
+
+  // Resolves when the video ends — or errors, or stops making progress (slow network).
+  function playedThrough() {
+    return new Promise((resolve) => {
+      let dog = 0;
+      const done = (ok) => { clearTimeout(dog); resolve(ok); };
+      const kick = () => { clearTimeout(dog); dog = setTimeout(() => done(false), STALL_MS); };
+      video.addEventListener('timeupdate', kick);
+      video.addEventListener('ended', () => done(true), { once: true });
+      video.addEventListener('error', () => done(false), { once: true });
+      kick();
+    });
   }
 
   async function intro() {
+    resize();
     await ready();
+    measureHeadline();
 
-    const canAnimate = scenes.back && scenes.front && flowerEl && typeof Element.prototype.animate === 'function';
-    if (reducedMotion.matches || !canAnimate) {
-      STAGES.forEach(step);
-      startAmbient();
-      return;
+    if (reducedMotion.matches || !video || !video.canPlayType('video/mp4')) return finalScreen();
+
+    // Each stage fires once, the first time the video clock passes its cue.
+    const pending = Object.entries(CUES).sort((a, b) => a[1] - b[1]);
+    const onTime = () => {
+      const now = video.currentTime;
+      while (pending.length && now >= pending[0][1]) {
+        const [cue] = pending.shift();
+        if (cue === 'emerge') emerging = true;
+        if (cue === 'named') { emerging = false; setNP(1); }
+        step(`is-${cue}`);
+      }
+      if (!pending.length) video.removeEventListener('timeupdate', onTime);
+    };
+    video.addEventListener('timeupdate', onTime);
+    const ended = playedThrough();
+
+    step('is-video');               // bud fades up (its poster is the first frame); embers + heartbeat
+    startLoop();
+    video.playbackRate = RATE;
+    try {
+      await video.play();
+    } catch (e) {
+      return finalScreen();         // autoplay refused (e.g. Low Power Mode) → skip to the end
     }
 
-    buildBud();
-    await new Promise((r) => requestAnimationFrame(r));
+    const ok = await ended;
+    if (!ok) return finalScreen();
 
-    step('is-stem');                // the stem grows and the closed bud rises onto it
-    await wait(2900);
-    step('is-bloom');               // the bud opens, petal by petal, in 3D (≈ 5s)
-    bloom();
-    await wait(1100);
-    step('is-logo');                // the name grows out from inside the flower
-    await wait(4500);
-    step('is-fall');                // petals come loose and drift down; the stem stays
-    fall();
-    await wait(1500);
-    step('is-title');               // "Coming Soon" under the stem
-    await wait(1800);
-    step('is-tagline');
-    await wait(1200);
-    step('is-social');
-    step('is-ambient');             // floating particles + breathing glow
-    startAmbient();
+    // Make sure every stage happened, even if a timeupdate was skipped.
+    emerging = false;
+    setNP(1);
+    FINAL.forEach(step);
+    startPetals();                  // the bloom is done: petals begin to fall
   }
 
   intro();

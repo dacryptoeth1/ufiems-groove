@@ -2,6 +2,8 @@
 *.jpeg
 *.JPG
 *.jpg
+# Original full-size bloom video (the site uses the compressed assets/rose-bloom.mp4)
+/75974-557353890_medium.mp4
 *.tmp
 *.log
 screenshots/

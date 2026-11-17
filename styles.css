@@ -2,12 +2,23 @@
    UFIEM’S GROOVE — Coming Soon
    Single-screen cinematic experience. Nothing scrolls.
 
-   Intro sequence (driven by main.js adding classes to <html>):
-     is-stem (stem grows, closed bud appears) → is-bloom (petals open; main.js) → is-logo (the name
-     emerges from inside the flower) → is-fall (petals drift down; main.js) → is-title → is-tagline
-     → is-social / is-ambient
+   Intro sequence — main.js adds classes to <html>, cued from the bloom video's timeupdate:
+     is-video   the bud fades up and starts opening (embers + heartbeat glow begin)
+     is-emerge  the name grows out of the bud; main.js writes --np (0 → 1) on .bloom every frame
+     is-named   the name is fully formed (metallic shine starts)
+     is-title   "COMING SOON" reveals letter by letter with a shimmer sweep
+     is-tagline → is-announce (launch teaser) → is-social
+     is-end     the video holds its last frame; the flower settles back and petals start to fall
+     is-still   show the last frame as an image instead of the video (reduced motion / no video)
    Without the `js` class (no JavaScript) every element renders in its final state.
    ========================================================================== */
+
+/* Animatable custom properties (shine sweeps). Browsers without @property just skip the sweep. */
+@property --sh {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: -40%;
+}
 
 :root {
   --black: #040208;
@@ -15,18 +26,23 @@
   --violet-hot: #b48cff;
   --silver: #dcd8e8;
 
-  /* Pointer / idle parallax, written by main.js (range -1..1). */
+  /* Pointer / tilt parallax, written by main.js (range -1..1). */
   --px: 0;
   --py: 0;
 
   --ease-out: cubic-bezier(.16, 1, .3, 1);
-  --ease-cine: cubic-bezier(.65, 0, .35, 1);
 
-  --font-title: "Italiana", "Cormorant Garamond", Didot, "Bodoni 72", serif;
-  --font-serif: "Cormorant Garamond", "Cormorant", Garamond, "Times New Roman", serif;
+  --font-name: "Cinzel Decorative", "Cinzel", "Trajan Pro", Didot, serif;
+  --font-display: "Bodoni Moda", Didot, "Bodoni 72", "Playfair Display", serif;
+  --font-thin: "Jost", "Futura", "Century Gothic", "Helvetica Neue", Arial, sans-serif;
+
+  /* The moving white highlight (position --sh) is written out where it's used, not as a variable here:
+     a variable would resolve --sh once on :root and never animate. */
+  /* Silver → violet metallic fill (vertical bands like polished chrome). */
+  --metal: linear-gradient(180deg, #fdfbff 0%, #e4dcf4 30%, #a593d0 50%, #7d63b8 56%, #d9cff0 74%, #f6f2ff 100%);
 
   /* Height reserved at the bottom for the contact links. */
-  --social-h: clamp(56px, 10dvh, 96px);
+  --social-h: clamp(52px, 9dvh, 84px);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -44,7 +60,7 @@ body {
   position: fixed;
   inset: 0;
   color: var(--silver);
-  font-family: var(--font-serif);
+  font-family: var(--font-thin);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
@@ -73,7 +89,7 @@ body {
   isolation: isolate;
   display: grid;
   place-items: center;
-  padding: 12px 16px calc(var(--social-h) + env(safe-area-inset-bottom, 0px));
+  padding: 8px 16px calc(var(--social-h) + env(safe-area-inset-bottom, 0px));
 }
 
 /* ==========================================================================
@@ -86,343 +102,364 @@ body {
   z-index: -1;
   overflow: hidden;
   pointer-events: none;
-  animation: fade-in 2.6s ease-out both;
+  animation: fade-in 2.4s ease-out both;
 }
-
 .env > * { position: absolute; }
-
-/* Parallax: each layer drifts by its own depth (px per unit of pointer). */
-.layer {
-  transform: translate3d(calc(var(--px) * var(--depth) * 1px),
-                         calc(var(--py) * var(--depth) * .6px), 0);
-  will-change: transform;
-}
 
 .env__base {
   inset: 0;
   background:
-    radial-gradient(ellipse 70% 55% at 50% 36%, #1d0d3a 0%, #0e0620 42%, transparent 78%),
+    radial-gradient(ellipse 70% 55% at 50% 34%, #1b0b36 0%, #0d061e 42%, transparent 78%),
     linear-gradient(180deg, #07030f 0%, var(--black) 60%, #020104 100%);
 }
 
 .env__ambient { inset: -15%; will-change: opacity, transform; }
-
 .env__ambient--a {
-  background: radial-gradient(ellipse 45% 38% at 26% 18%, rgba(112, 52, 230, .24), transparent 70%);
+  background: radial-gradient(ellipse 45% 38% at 24% 18%, rgba(112, 52, 230, .2), transparent 70%);
   animation: ambient-a 17s ease-in-out infinite alternate;
 }
-
 .env__ambient--b {
-  background: radial-gradient(ellipse 48% 40% at 78% 82%, rgba(84, 24, 168, .28), transparent 70%);
+  background: radial-gradient(ellipse 48% 40% at 78% 84%, rgba(84, 24, 168, .24), transparent 70%);
   animation: ambient-b 23s ease-in-out infinite alternate;
-}
-
-/* A colossal, barely-visible ring far behind everything. */
-.env__halo {
-  left: 50%;
-  top: 38%;
-  width: 160vmax;
-  height: 160vmax;
-  margin: -80vmax 0 0 -80vmax;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle,
-      transparent 0 21.7%, rgba(170, 130, 255, .06) 22%, transparent 22.4%,
-      transparent 33.6%, rgba(170, 130, 255, .04) 34%, transparent 34.5%,
-      transparent 49.2%, rgba(170, 130, 255, .025) 49.6%, transparent 50%);
-  animation: breathe 12s ease-in-out infinite;
-}
-
-.env__shafts {
-  inset: -5% 0 auto 0;
-  height: 85%;
-  background:
-    linear-gradient(101deg, transparent 31%, rgba(168, 128, 255, .05) 37%, transparent 43%),
-    linear-gradient(79deg, transparent 53%, rgba(168, 128, 255, .04) 58%, transparent 64%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 10%, transparent 100%);
-          mask-image: linear-gradient(to bottom, #000 10%, transparent 100%);
-  animation: shafts 14s ease-in-out infinite alternate;
 }
 
 .env__floor {
   left: -10%;
   right: -10%;
   bottom: -18%;
-  height: 50%;
-  background: radial-gradient(ellipse 50% 50% at 50% 100%, rgba(98, 40, 200, .24), rgba(48, 16, 100, .1) 45%, transparent 72%);
-  animation: breathe 9s ease-in-out infinite reverse;
+  height: 46%;
+  background: radial-gradient(ellipse 50% 50% at 50% 100%, rgba(98, 40, 200, .22), rgba(48, 16, 100, .08) 45%, transparent 72%);
+  animation: breathe 9s ease-in-out infinite;
 }
 
-/* Fog — seamless tiles drifting sideways. Gradients stay inside their tile. */
-.fog { inset: -8%; overflow: hidden; }
-
-.fog::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: 200%;
-  background-repeat: repeat-x;
-  background-size: 50% 100%;
-  will-change: transform;
-}
-
-.fog--back::before {
-  background-image:
-    radial-gradient(ellipse 30% 20% at 26% 62%, rgba(120, 70, 210, .14), transparent 70%),
-    radial-gradient(ellipse 28% 16% at 66% 34%, rgba(96, 44, 180, .11), transparent 70%),
-    radial-gradient(ellipse 58% 14% at 50% 84%, rgba(140, 96, 230, .09), transparent 70%);
-  animation: drift 140s linear infinite;
-}
-
-.fog--front::before {
-  background-image:
-    radial-gradient(ellipse 36% 18% at 34% 92%, rgba(70, 28, 130, .38), transparent 70%),
-    radial-gradient(ellipse 30% 13% at 74% 82%, rgba(120, 72, 210, .12), transparent 70%);
-  animation: drift 80s linear infinite reverse;
-}
-
-/* Ambient particle canvas — fades in once the intro has finished. */
+/* Embers canvas. */
 .fx {
   inset: 0;
   width: 100%;
   height: 100%;
-  transition: opacity 3.5s ease-out;
+  transition: opacity 3s ease-out;
 }
 .js .fx { opacity: 0; }
-.js.is-ambient .fx { opacity: 1; }
+.js.is-video .fx { opacity: 1; }
 
 .env__vignette {
   inset: 0;
-  background: radial-gradient(ellipse 78% 72% at 50% 44%, transparent 38%, rgba(2, 1, 5, .62) 78%, rgba(0, 0, 0, .94) 100%);
+  background: radial-gradient(ellipse 80% 74% at 50% 42%, transparent 40%, rgba(2, 1, 5, .6) 80%, rgba(0, 0, 0, .92) 100%);
 }
 
 .env__grain {
   inset: -120px;
-  opacity: .06;
+  opacity: .05;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   animation: grain 1.1s steps(5) infinite;
 }
 
 /* ==========================================================================
-   Hero
+   Hero layout
+   NOTE: .hero and .bloom must stay free of transform / filter / opacity / z-index / isolation —
+   any of those would trap the video's mix-blend-mode and show its black square.
    ========================================================================== */
 
 .hero {
-  /* --L is the logo width; the flower (logo + stem) is 1.3 × --L tall. */
-  --L: clamp(160px, min(78vw, 44dvh), 500px);
-  --cs: clamp(28px, min(7vw, 7.6dvh), 92px);
-  --gap: clamp(6px, 1.6dvh, 18px);
+  /* --F: the bloom square. Everything else is sized so the column fits the screen height. */
+  --F: clamp(190px, min(88vw, 51dvh), 640px);
+  --nf: clamp(17px, min(calc(var(--F) * .1), 6.1vw), 66px);    /* name */
+  --cs: clamp(16px, min(5.6vw, 4.6dvh), 46px);                    /* COMING SOON */
+  --tg: clamp(13px, min(3.6vw, 2.4dvh), 21px);                    /* tagline */
+  --an: clamp(10px, min(2.9vw, 1.9dvh), 15px);                   /* launch teaser */
+  --gap: clamp(6px, 1.5dvh, 18px);
 
-  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   max-width: 100%;
   text-align: center;
-  transform: translate3d(calc(var(--px) * -6px), calc(var(--py) * -4px), 0);
 }
 
-/* ---- Flower: stem + petals (SVG) with the logo as its heart ---- */
-.flower {
+.bloom {
+  --np: 1;          /* name progress 0..1 (main.js) */
   position: relative;
-  width: var(--L);
-  aspect-ratio: 1000 / 1300;
+  width: var(--F);
+  height: var(--F);
   flex: none;
 }
+.js .bloom { --np: 0; }
 
-.flower__glow {
+/* Heartbeat glow behind the flower. */
+.bloom__pulse {
   position: absolute;
-  left: 50%;
-  top: 35.85%;               /* monogram centre: 466 / 1300 */
-  width: 175%;
+  left: 49%;
+  top: 50%;
+  width: 92%;
   aspect-ratio: 1;
   border-radius: 50%;
-  transform: translate(-50%, -50%);
-  background: radial-gradient(circle, rgba(140, 80, 255, .30) 0%, rgba(104, 48, 220, .13) 26%, rgba(60, 20, 140, .05) 46%, transparent 64%);
+  margin: -46% 0 0 -46%;
+  background: radial-gradient(circle, rgba(150, 90, 255, .32) 0%, rgba(110, 50, 230, .2) 30%, rgba(70, 20, 160, .07) 52%, transparent 70%);
+  transform: translate3d(calc(var(--px) * 5px), calc(var(--py) * 4px), 0);
   pointer-events: none;
-  transition: opacity 2.4s ease-out;
+  transition: opacity 2.5s ease-out;
 }
-.js .flower__glow { opacity: 0; }
-.js.is-bloom .flower__glow { opacity: 1; }
-.js.is-ambient .flower__glow { animation: glow 7s ease-in-out infinite; }
+.bloom__pulse::after {               /* the beat itself */
+  content: "";
+  position: absolute;
+  inset: 12%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(190, 140, 255, .5), rgba(130, 70, 255, .16) 45%, transparent 70%);
+  opacity: .35;
+  animation: heartbeat 2.2s ease-out infinite;
+}
+.js .bloom__pulse { opacity: 0; }
+.js.is-video .bloom__pulse { opacity: 1; }
 
-/* Two layers of the same 1000 × 1300 drawing: back petals + stem behind the logo,
-   front petals + sepals in front of it, so the opening petals reveal the name. */
-.rose {
+/* ---- The video: tinted, feathered, screen-blended so its black disappears ---- */
+.bloom__media {
+  /* Black & deep-purple duotone (the green stem and sepals go violet too). */
+  --tint: grayscale(1) sepia(1) hue-rotate(218deg) saturate(2.4) brightness(.66) contrast(1.3);
+
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  filter: var(--tint);
+  opacity: calc(1 - var(--np) * .32);
+  transform: translate3d(calc(var(--px) * -8px), calc(var(--py) * -5px), 0);
+  /* Feather the frame; the stem fades out downwards but stays. */
+  -webkit-mask-image: radial-gradient(ellipse 56% 50% at 48% 52%, #000 60%, transparent 100%);
+          mask-image: radial-gradient(ellipse 56% 50% at 48% 52%, #000 60%, transparent 100%);
+}
+.bloom__video, .bloom__still {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  overflow: visible;
-  pointer-events: none;
+  object-fit: cover;
+  display: block;
 }
-.rose--back  { z-index: 0; }
-.rose--front { z-index: 3; }   /* sepals sit over the base of the petals */
+.bloom__still { display: none; }
 
-.petal-defs { position: absolute; width: 0; height: 0; overflow: hidden; }
+html:not(.js) .bloom__video { display: none; }
+html:not(.js) .bloom__still { display: block; }
+html:not(.js) .bloom__media,
+.js.is-end .bloom__media,
+.js.is-still .bloom__media { opacity: .8; filter: var(--tint) blur(.4px); }
+.js .bloom__media { transition: opacity 1.4s ease-out; }
+.js:not(.is-video) .bloom__media { opacity: 0; }
+.js.is-end .bloom__media { transition: opacity 3s ease-out, filter 3s ease-out; }
+.js.is-still .bloom__video { display: none; }
+.js.is-still .bloom__still { display: block; }
 
-/* ---- 3D petals ----
-   Each .bloom is a zero-size anchor on the bud's base (497, 1030 of 1000 × 1300) with its own
-   perspective; both layers share the same camera so they line up. Inside the scene 1em = 100
-   drawing units, so the petals scale with the logo. */
-.bloom {
+/* ---- The name ---- */
+.name {
   position: absolute;
-  left: 49.7%;
-  top: 79.23%;
-  width: 0;
-  height: 0;
-  perspective: calc(var(--L) * 2.6);
-  perspective-origin: 0 calc(var(--L) * -.22);
+  left: 49%;
+  top: 41%;
+  margin: 0;
+  font-weight: inherit;
+  white-space: nowrap;
   pointer-events: none;
-  transition: opacity 1.4s ease-out;
+  transform: translate(-50%, -50%) translate3d(calc(var(--px) * 12px), calc(var(--py) * 8px), 0)
+             perspective(800px) rotateY(calc(var(--px) * 7deg)) rotateX(calc(var(--py) * -6deg));
 }
-.bloom--back  { z-index: 0; }
-.bloom--front { z-index: 2; }
 
-.bloom__scene {
+/* Emergence: from the bud's centre (42%, 46% of the frame) — tiny, blurred, over-bright — to full size. */
+.name__inner {
+  position: relative;
+  display: block;
+  transform:
+    translate3d(calc((1 - var(--np)) * var(--F) * -.07), calc((1 - var(--np)) * var(--F) * .05), 0)
+    scale(calc(.14 + var(--np) * .86));
+  opacity: min(1, calc(var(--np) * 3.2));
+  filter:
+    blur(calc((1 - var(--np)) * 12px))
+    brightness(calc(1 + (1 - var(--np)) * 1.4))
+    drop-shadow(0 0 calc(6px + (1 - var(--np)) * 22px) rgba(168, 112, 255, .75))
+    drop-shadow(0 2px 3px rgba(0, 0, 0, .9));
+}
+
+/* The U emblem, small, sitting just above the name (anchored so the name itself doesn't move). */
+.name__emblem {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  width: calc(var(--nf) * 1.75);
+  height: auto;
+  margin-bottom: calc(var(--nf) * -.12);
+  transform: translateX(-50%);
+  opacity: .94;
+}
+
+.name__text {
+  display: block;
+  padding: .12em .2em;
+  font-family: var(--font-name);
+  font-weight: 700;
+  font-size: var(--nf);
+  line-height: 1.1;
+  letter-spacing: .05em;
+  color: #ece6fa;                            /* fallback if background-clip:text is missing */
+  background-image:
+    linear-gradient(105deg, transparent calc(var(--sh) - 12%), rgba(255, 255, 255, .95) var(--sh), transparent calc(var(--sh) + 12%)),
+    var(--metal);
+  -webkit-background-clip: text;
+          background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.js.is-named .name__text { animation: shine 7s ease-in-out 1.2s infinite; }
+.js.is-named .name { animation: name-glow 7s ease-in-out infinite; }
+
+/* Falling petals — a full-screen 3D layer, filled by main.js. */
+.petals {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  perspective: 900px;
+}
+.petal {
   position: absolute;
   left: 0;
   top: 0;
-  width: 0;
-  height: 0;
-  font-size: calc(var(--L) / 10);
   transform-style: preserve-3d;
-  transform-origin: 0 0;
-  transform: rotateX(-12deg);           /* camera slightly above the flower */
-  transition: transform 1.8s var(--ease-out);
+  will-change: transform, opacity;
 }
-
-/* The closed bud rises into view on its base. */
-.js .bloom { opacity: 0; }
-.js .bloom__scene { transform: rotateX(-12deg) scale(.3); }
-.js.is-stem .bloom { opacity: 1; transition-delay: .9s; }
-.js.is-stem .bloom__scene { transform: rotateX(-12deg); transition-delay: .9s; }
-
-.petal3d {
-  position: absolute;
-  bottom: 0;
-  transform-origin: 50% 100%;           /* every petal hinges on its base */
-  backface-visibility: visible;
+.petal__spin {
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
   will-change: transform;
 }
-.petal3d { transform-style: preserve-3d; }
-.petal3d .ph { position: absolute; top: 0; bottom: 0; width: 50.4%; backface-visibility: visible; }
-.petal3d .ph--l { left: 0; transform-origin: 100% 50%; }
-.petal3d .ph--r { right: 0; transform-origin: 0% 50%; }
-.petal3d svg { display: block; width: 100%; height: 100%; overflow: visible; }
-.petal3d .pt-shade { fill: #000; fill-opacity: var(--shade, .2); }
-.petal3d .pt-veins { fill: none; stroke: rgba(150, 104, 240, .16); stroke-width: .45; stroke-linecap: round; }
-.petal3d .pt-rim { fill: none; stroke: url(#pt-rim); stroke-width: 1.1; stroke-linecap: round; }
-.petal3d .pt-edge { fill: none; stroke: rgba(150, 105, 255, .32); stroke-width: .6; }
-
-/* Stem */
-.stem__body, .stem__rim {
-  fill: none;
-  stroke-linecap: round;
-  stroke-dasharray: 1;
-  stroke-dashoffset: 0;
-  transition: stroke-dashoffset 2s var(--ease-cine);
-}
-.stem__body { stroke: url(#stem-fill); stroke-width: 13; }
-.stem__rim  { stroke: url(#stem-rim); stroke-width: 2.4; transition-delay: .1s; }
-
-.stem__body, .stem__rim { transition-duration: 1.6s; }
-
-.stem__leaf, .stem__thorns, .calyx {
-  transform-box: fill-box;
-  transition: transform 1.4s var(--ease-out), opacity 1.2s ease-out;
-}
-.stem__leaf--r { transform-origin: 0% 40%; transition-delay: .35s; }
-.stem__leaf--l { transform-origin: 100% 40%; transition-delay: .6s; }
-.stem__thorns  { transition-delay: .7s; }
-.calyx         { transform-origin: 50% 25%; transition-delay: 1s; }
-
-.js .stem__body, .js .stem__rim { stroke-dashoffset: 1; }
-.js .stem__leaf, .js .calyx { opacity: 0; transform: scale(0); }
-.js .stem__thorns { opacity: 0; }
-.js.is-stem .stem__body, .js.is-stem .stem__rim { stroke-dashoffset: 0; }
-.js.is-stem .stem__leaf, .js.is-stem .calyx { opacity: 1; transform: none; }
-.js.is-stem .stem__thorns { opacity: 1; }
-
-/* ---- Logo ---- */
-.logo {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 100%;
-  z-index: 1;
-  font-size: 0;
-  line-height: 0;
-  transform-origin: 50% 50%;
-  transition:
-    opacity 1.8s ease-out .3s,
-    transform 4s cubic-bezier(.32, .08, .2, 1),
-    filter 3s ease-out .4s;
-}
-.logo img { display: block; width: 100%; height: auto; }
-
-/* Live wordmark over the emblem: Cinzel (Trajan-style capitals, like the original lettering). */
-.logo__wordmark {
-  position: absolute;
-  inset: 0;
+.petal svg {
+  display: block;
   width: 100%;
   height: 100%;
   overflow: visible;
-  filter: drop-shadow(0 0 6px rgba(150, 100, 255, .35));
-}
-.logo__wordmark text {
-  font-family: "Cinzel", "Trajan Pro", "Cormorant Garamond", serif;
-  font-weight: 400;
-  font-size: 64px;            /* SVG user units: Cinzel caps are 0.72em → 46px, matching the original */
+  filter: drop-shadow(0 6px 6px rgba(0, 0, 0, .55));
 }
 
-/* Before the bloom the logo is tiny and hidden inside the bud (its heart ≈ y 820 of 1300, i.e.
-   30% of the logo's own height below its final centre); the bloom lifts and grows it into place. */
-.js .logo { opacity: 0; transform: translate3d(0, 30%, 0) scale(.08); filter: blur(6px) brightness(1.8); }
-.js.is-logo .logo { opacity: 1; transform: none; filter: blur(0) brightness(1); }
-.js.is-ambient .logo { animation: logo-breathe 7s ease-in-out infinite; }
+/* ==========================================================================
+   Copy: COMING SOON, tagline, launch teaser
+   ========================================================================== */
 
-/* ---- Coming Soon ---- */
+.copy {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: calc(var(--F) * -.14);
+  transform: translate3d(calc(var(--px) * -5px), calc(var(--py) * -3px), 0);
+}
+
 .headline {
-  margin-top: var(--gap);
-  padding-left: .14em;           /* balances trailing letter-spacing */
-  font-family: var(--font-title);
+  padding-left: .4em;                       /* balances the trailing letter-spacing */
+  font-family: var(--font-display);
   font-weight: 400;
   font-size: var(--cs);
-  line-height: 1.1;
-  letter-spacing: .14em;
+  line-height: 1.15;
+  letter-spacing: .4em;
   white-space: nowrap;
-  color: #f1ecff;
-  text-shadow: 0 0 22px rgba(150, 100, 255, .45), 0 0 2px rgba(255, 255, 255, .3);
+  filter: drop-shadow(0 0 14px rgba(150, 100, 255, .5));
 }
+.headline__letters { position: relative; display: inline-block; }
 .headline__word { display: inline-block; }
+.headline__space { display: inline-block; width: .3em; }
+
+/* Each letter shows its slice of one shared gradient (main.js sets --x per letter and --hw),
+   so the metallic bands and the shimmer run continuously across the whole word. */
 .headline__word > span {
   display: inline-block;
-  transition: opacity 1.3s ease-out, transform 1.6s var(--ease-out), filter 1.3s ease-out;
-  transition-delay: calc(var(--i) * 85ms);
+  color: #ece6fa;
+  background-image:
+    linear-gradient(105deg, transparent calc(var(--sh) - 12%), rgba(255, 255, 255, .95) var(--sh), transparent calc(var(--sh) + 12%)),
+    var(--metal);
+  background-size: var(--hw, 100%) 100%;
+  background-position: calc(var(--x, 0) * -1px) 0;
+  background-repeat: no-repeat;
+  -webkit-background-clip: text;
+          background-clip: text;
+  -webkit-text-fill-color: transparent;
+  transition: opacity 1.1s ease-out, transform 1.4s var(--ease-out), filter 1.1s ease-out;
+  transition-delay: calc(var(--i) * 110ms);
 }
-.js .headline__word > span { opacity: 0; transform: translate3d(0, .5em, 0) scale(.9); filter: blur(8px); }
+.js .headline__word > span { opacity: 0; transform: translate3d(0, .45em, 0) scale(.86); filter: blur(7px); }
 .js.is-title .headline__word > span { opacity: 1; transform: none; filter: blur(0); }
-.js.is-ambient .headline { animation: title-glow 6s ease-in-out infinite; }
+/* One sweep that follows the reveal, then an occasional gleam. */
+.js.is-title .headline { animation: sweep 1.9s ease-in-out .35s both, shine 9s ease-in-out 5s infinite; }
 
-/* ---- Tagline ---- */
 .tagline {
-  margin-top: calc(var(--gap) * .9);
-  max-width: 24em;
+  margin-top: calc(var(--gap) * .8);
+  max-width: 26em;
   padding: 0 4px;
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-weight: 300;
-  font-size: clamp(15px, min(2.2vw, 3dvh), 24px);
-  line-height: 1.35;
-  letter-spacing: .04em;
-  color: rgba(222, 216, 238, .76);
-  transition: opacity 2s ease-out, transform 2.2s var(--ease-out), filter 2s ease-out;
+  font-family: var(--font-thin);
+  font-weight: 200;
+  font-size: var(--tg);
+  line-height: 1.4;
+  letter-spacing: .14em;
+  color: rgba(226, 218, 244, .82);
+  transition: opacity 1.8s ease-out, transform 2s var(--ease-out), filter 1.8s ease-out;
 }
-.js .tagline { opacity: 0; transform: translate3d(0, 10px, 0); filter: blur(5px); }
+.js .tagline { opacity: 0; transform: translate3d(0, 8px, 0); filter: blur(5px); }
 .js.is-tagline .tagline { opacity: 1; transform: none; filter: blur(0); }
+
+/* ---- Launch teaser: "Launch date ◆ to be announced …" ---- */
+.announce {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(8px, 1.6vw, 18px);
+  margin-top: calc(var(--gap) * 1.5);
+  white-space: nowrap;
+  transition: opacity 1.6s ease-out, transform 1.8s var(--ease-out), filter 1.6s ease-out;
+}
+.js .announce { opacity: 0; transform: translate3d(0, 10px, 0); filter: blur(6px); }
+.js.is-announce .announce { opacity: 1; transform: none; filter: blur(0); }
+
+.announce__line {
+  width: clamp(18px, 6vw, 72px);
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(180, 140, 255, .7));
+}
+.announce__line:last-child { background: linear-gradient(270deg, transparent, rgba(180, 140, 255, .7)); }
+
+.announce__text {
+  display: inline-flex;
+  align-items: center;
+  padding: .95em 1.5em .95em 1.85em;      /* extra left balances the trailing letter-spacing */
+  border: 1px solid rgba(170, 130, 255, .24);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(40, 16, 80, .45), rgba(12, 4, 26, .55));
+  box-shadow: inset 0 1px 0 rgba(220, 200, 255, .08), 0 0 18px rgba(110, 50, 230, .14);
+  font-family: var(--font-thin);
+  font-weight: 300;
+  font-size: var(--an);
+  line-height: 1;
+  letter-spacing: .34em;
+  text-transform: uppercase;
+  color: rgba(230, 220, 250, .9);
+  text-shadow: 0 0 8px rgba(160, 110, 255, .35);
+  animation: announce-glow 3.6s ease-in-out infinite;
+}
+
+.announce__gem {
+  flex: none;
+  width: .38em;
+  height: .38em;
+  margin: 0 .9em 0 .55em;
+  transform: rotate(45deg);
+  background: rgba(190, 150, 255, .85);
+  box-shadow: 0 0 8px rgba(160, 110, 255, .9);
+}
+
+.announce__dots { display: inline-flex; gap: .34em; margin-left: .1em; }
+.announce__dots i {
+  width: .3em;
+  height: .3em;
+  border-radius: 50%;
+  background: #cdb0ff;
+  opacity: .6;
+  animation: dot 1.6s ease-in-out infinite;
+}
+.announce__dots i:nth-child(2) { animation-delay: .2s; }
+.announce__dots i:nth-child(3) { animation-delay: .4s; }
 
 /* ==========================================================================
    Contact links
@@ -432,18 +469,23 @@ body {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + clamp(4px, 2.4dvh, 26px));
+  bottom: calc(env(safe-area-inset-bottom, 0px) + clamp(4px, 2.2dvh, 24px));
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
   gap: 0 clamp(6px, 1.6vw, 22px);
-  padding: 0 12px;
+  padding: 0 10px;
   list-style: none;
-  transition: opacity 1.8s ease-out, transform 1.8s var(--ease-out);
 }
-.js .social { opacity: 0; transform: translate3d(0, 8px, 0); }
-.js.is-social .social { opacity: 1; transform: none; }
+.social > li {
+  transition: opacity 1.6s ease-out, transform 1.8s var(--ease-out), filter 1.6s ease-out;
+  transition-delay: calc(var(--k) * 220ms);
+}
+.js .social > li { opacity: 0; transform: translate3d(0, 10px, 0); filter: blur(4px); }
+.js.is-social .social > li { opacity: 1; transform: none; filter: blur(0); }
+.js .social > li.social__sep { transform: rotate(45deg) scale(0); }
+.js.is-social .social > li.social__sep { transform: rotate(45deg); }
 
 .social a {
   display: inline-flex;
@@ -452,11 +494,11 @@ body {
   min-height: 44px;
   padding: 0 8px;
   border-radius: 4px;
-  font-family: var(--font-serif);
-  font-weight: 400;
-  font-size: clamp(13px, min(1.5vw, 2.4dvh), 16px);
-  letter-spacing: .06em;
-  color: rgba(214, 204, 240, .72);
+  font-family: var(--font-thin);
+  font-weight: 300;
+  font-size: clamp(12.5px, min(1.5vw, 2.3dvh), 16px);
+  letter-spacing: .08em;
+  color: rgba(214, 204, 240, .74);
   text-decoration: none;
   transition: color .4s ease, text-shadow .4s ease;
 }
@@ -487,36 +529,38 @@ body {
    Responsive
    ========================================================================== */
 
-/* Portrait phones: let the logo use more of the width. */
-@media (max-width: 640px) and (orientation: portrait) {
-  .hero {
-    --L: clamp(160px, min(86vw, 46dvh), 420px);
-    --cs: clamp(26px, min(10vw, 6.4dvh), 60px);
-  }
-  .tagline { font-size: clamp(15px, min(4.4vw, 2.8dvh), 20px); }
+/* Narrow phones: tighter tracking so everything stays on one line. */
+@media (max-width: 380px) {
+  .headline { letter-spacing: .32em; padding-left: .32em; }
+  .tagline { letter-spacing: .1em; }
+  .social { gap: 0 2px; }
+  .social a { gap: 6px; padding: 0 4px; letter-spacing: .03em; }
 }
 
-@media (max-width: 400px) {
-  .social { gap: 0 2px; }
-  .social a { gap: 6px; padding: 0 4px; font-size: 13px; letter-spacing: .03em; }
+/* Small phones: drop the side rules and tighten the teaser so it stays on one line. */
+@media (max-width: 420px) {
+  .announce__line { display: none; }
+  .announce__text { letter-spacing: .24em; padding: .9em 1.2em .9em 1.44em; }
 }
 
 /* Short landscape (phones on their side): flower on the left, words on the right. */
 @media (orientation: landscape) and (max-height: 520px) {
-  :root { --social-h: clamp(44px, 13dvh, 60px); }
-  .stage { padding-top: 8px; }
+  :root { --social-h: clamp(40px, 12dvh, 56px); }
+  .stage { padding-top: 4px; }
   .hero {
-    --L: calc((100dvh - var(--social-h) - 20px) / 1.3);
-    --cs: clamp(24px, min(5.4vw, 11dvh), 56px);
-    display: grid;
-    grid-template-columns: auto auto;
-    grid-template-rows: 1fr auto auto 1fr;
-    column-gap: clamp(20px, 5vw, 64px);
-    align-items: center;
+    --F: clamp(150px, min(44vw, calc(100dvh - var(--social-h) - 12px)), 460px);
+    --nf: clamp(14px, calc(var(--F) * .075), 36px);
+    --cs: clamp(15px, min(3.6vw, 7dvh), 34px);
+    --tg: clamp(11px, min(2vw, 4dvh), 17px);
+    --an: clamp(8.5px, min(1.55vw, 3.6dvh), 13px);
+    --gap: clamp(4px, 2dvh, 12px);
+    flex-direction: row;
+    gap: clamp(8px, 3vw, 48px);
   }
-  .flower { grid-column: 1; grid-row: 1 / -1; }
-  .headline { grid-column: 2; grid-row: 2; margin-top: 0; }
-  .tagline { grid-column: 2; grid-row: 3; font-size: clamp(13px, 4.2dvh, 19px); max-width: 18em; justify-self: center; }
+  .copy { margin-top: 0; }
+  .announce__line { display: none; }
+  .announce__text { letter-spacing: .24em; padding: .9em 1.2em .9em 1.44em; }
+  .social a { min-height: 36px; }
 }
 
 /* ==========================================================================
@@ -529,20 +573,11 @@ body {
   0%   { opacity: .45; transform: translate3d(-2%, -1%, 0) scale(1); }
   100% { opacity: 1;   transform: translate3d(3%, 2%, 0) scale(1.08); }
 }
-
 @keyframes ambient-b {
   0%   { opacity: 1;   transform: translate3d(2%, 1%, 0) scale(1.05); }
   100% { opacity: .4;  transform: translate3d(-3%, -2%, 0) scale(1); }
 }
-
 @keyframes breathe { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
-
-@keyframes shafts {
-  0%   { opacity: .5; transform: translate3d(-2%, 0, 0); }
-  100% { opacity: 1;  transform: translate3d(2%, 0, 0); }
-}
-
-@keyframes drift { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(-50%, 0, 0); } }
 
 @keyframes grain {
   0%   { transform: translate3d(0, 0, 0); }
@@ -553,41 +588,51 @@ body {
   100% { transform: translate3d(0, 0, 0); }
 }
 
-@keyframes glow {
-  0%, 100% { opacity: .75; transform: translate(-50%, -50%) scale(.95); }
-  50%      { opacity: 1;   transform: translate(-50%, -50%) scale(1.06); }
+/* lub-dub … rest */
+@keyframes heartbeat {
+  0%   { opacity: .3;  transform: scale(.9); }
+  9%   { opacity: .95; transform: scale(1.06); }
+  18%  { opacity: .45; transform: scale(.96); }
+  27%  { opacity: .85; transform: scale(1.1); }
+  55%  { opacity: .3;  transform: scale(.92); }
+  100% { opacity: .3;  transform: scale(.9); }
+}
+/* Metallic shine: a quick pass, then a rest. */
+@keyframes shine {
+  0%        { --sh: -40%; }
+  32%, 100% { --sh: 140%; }
+}
+@keyframes sweep {
+  from { --sh: -40%; }
+  to   { --sh: 140%; }
 }
 
-@keyframes logo-breathe {
+@keyframes name-glow {
   0%, 100% { filter: drop-shadow(0 0 0 rgba(150, 100, 255, 0)); }
-  50%      { filter: drop-shadow(0 0 14px rgba(150, 100, 255, .35)); }
+  50%      { filter: drop-shadow(0 0 18px rgba(150, 100, 255, .45)); }
 }
 
-@keyframes title-glow {
-  0%, 100% { text-shadow: 0 0 22px rgba(150, 100, 255, .45), 0 0 2px rgba(255, 255, 255, .3); }
-  50%      { text-shadow: 0 0 32px rgba(170, 120, 255, .7), 0 0 2px rgba(255, 255, 255, .4); }
+@keyframes announce-glow {
+  0%, 100% { text-shadow: 0 0 8px rgba(160, 110, 255, .35);
+             box-shadow: inset 0 1px 0 rgba(220, 200, 255, .08), 0 0 18px rgba(110, 50, 230, .14); }
+  50%      { text-shadow: 0 0 16px rgba(190, 140, 255, .85), 0 0 2px rgba(255, 255, 255, .4);
+             box-shadow: inset 0 1px 0 rgba(220, 200, 255, .12), 0 0 30px rgba(130, 70, 255, .32); }
+}
+@keyframes dot {
+  0%, 70%, 100% { opacity: .25; transform: translateY(0); box-shadow: none; }
+  35%           { opacity: 1; transform: translateY(-.28em); box-shadow: 0 0 6px rgba(190, 140, 255, .9); }
 }
 
 /* ==========================================================================
-   Reduced motion — no bloom, no falling petals, no drifting. Gentle fades only.
+   Reduced motion — the final screen, still, with no movement at all.
    ========================================================================== */
 
 @media (prefers-reduced-motion: reduce) {
-  .env, .env *, .env *::before, .env *::after,
-  .flower__glow, .logo, .headline {
+  *, *::before, *::after {
     animation: none !important;
+    transition: none !important;
   }
-  .env { opacity: 1; }
-  .layer, .hero { transform: none !important; }
-  .stem__body, .stem__rim, .stem__leaf, .stem__thorns, .calyx, .bloom, .bloom__scene,
-  .logo, .headline__word > span, .tagline, .social, .flower__glow, .fx {
-    transition: opacity 1s ease-out !important;
-    transition-delay: 0s !important;
-  }
-  .js .stem__body, .js .stem__rim { stroke-dashoffset: 0; }
-  .js .stem__leaf, .js .calyx,
-  .js .logo, .js .headline__word > span, .js .tagline, .js .social {
-    transform: none;
-    filter: none;
-  }
+  .bloom__media, .bloom__pulse, .name, .copy { transform: none !important; }
+  .name { transform: translate(-50%, -50%) !important; }
+  .petals { display: none; }
 }
